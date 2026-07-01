@@ -1,18 +1,26 @@
 package org.example.uptodate.services;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
 @Service
 public class EmailService {
+
     private final JavaMailSender mailSender;
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
+
     @Async
     public void sendEmail(String toEmail, String username) {
         SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setFrom("your_email@gmail.com");
+        mailMessage.setFrom(fromEmail);
         mailMessage.setTo(toEmail);
         mailMessage.setSubject("UpToDate welcome message");
         String body = "Hi " + username + ",\n\n" +
@@ -24,10 +32,11 @@ public class EmailService {
         mailMessage.setText(body);
         mailSender.send(mailMessage);
     }
+
     @Async
     public void sendPasswordChangeCode(String toEmail, String code){
         SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setFrom("your_email@gmail.com");
+        mailMessage.setFrom(fromEmail);
         mailMessage.setTo(toEmail);
         mailMessage.setSubject("Password Change Code");
         String body = "You recently requested to change your password.\n\n" +
@@ -37,5 +46,4 @@ public class EmailService {
         mailMessage.setText(body);
         mailSender.send(mailMessage);
     }
-
 }
