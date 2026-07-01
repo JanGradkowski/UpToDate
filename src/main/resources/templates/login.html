@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UpToDate - Log In</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="logo"><a th:href="@{/}" style="color: inherit; text-decoration: none;">UpToDate</a></div>
+</nav>
+
+<main class="hero auth-hero">
+    <div class="auth-container">
+        <h2>Welcome Back</h2>
+        <p class="auth-subtitle">Log in to see what's new.</p>
+
+        <div th:if="${param.error}" class="alert alert-error">
+            Invalid username or password.
+        </div>
+        <div th:if="${param.logout}" class="alert alert-success">
+            You have been logged out.
+        </div>
+        <div th:if="${param.registered}" class="alert alert-success">
+            Account created! Please log in.
+        </div>
+
+        <form th:action="@{/login}" method="POST" class="auth-form">
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required placeholder="Enter your username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter your password">
+            </div>
+
+            <button type="submit" class="btn btn-primary auth-submit">Log In</button>
+        </form>
+
+        <p class="auth-switch">Don't have an account? <a th:href="@{/signup}">Sign up here</a>.</p>
+    </div>
+</main>
+
+</body>
+</html>

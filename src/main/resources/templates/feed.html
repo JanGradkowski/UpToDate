@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feed - UpToDate</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a; animation: none;">
+
+<div th:replace= "~{fragments/navbar :: main-navbar}"></div>
+
+<main class="feed-container">
+
+  <div class="story-tray" style="display: flex; gap: 1rem; overflow-x: auto; padding: 1rem 0; border-bottom: 1px solid #dbdbdb; margin-bottom: 1rem; scrollbar-width: none;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; min-width: 70px;" onclick="document.getElementById('storyUploadInput').click()">
+      <input type="file" id="storyUploadInput" accept="image/*,video/mp4,video/webm" style="display: none;" onchange="uploadStory(this)">
+      <div style="position: relative;">
+        <img th:src="${currentUser.profilePictureUrl != null ? currentUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;" id="yourStoryAvatar">
+        <div id="storyUploadIndicator" style="position: absolute; bottom: 0; right: 0; background: #0095f6; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; border: 2px solid white; transition: all 0.3s ease;">+</div>
+      </div>
+      <span id="storyUploadText" style="font-size: 0.75rem; color: #888;">Your Story</span>
+    </div>
+
+    <div th:each="storyUser : ${usersWithStories}" th:data-username="${storyUser.username}" onclick="openStoryViewer(this.getAttribute('data-username'))" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; min-width: 70px;">
+      <div style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); padding: 3px; border-radius: 50%;">
+        <img th:src="${storyUser.profilePictureUrl != null ? storyUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 54px; height: 54px; border-radius: 50%; border: 2px solid white; object-fit: cover;">
+      </div>
+      <span style="font-size: 0.75rem; font-weight: 600;" th:text="${storyUser.username}">username</span>
+    </div>
+  </div>
+
+  <div th:if="${searchResults != null}" class="search-results-box">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; align-items: center;">
+      <h3 th:text="'Search results for \'' + ${searchQuery} + '\''">Results</h3>
+      <a th:href="@{/feed}" style="text-decoration: none; color: #888; font-size: 0.9rem;">Clear X</a>
+    </div>
+    <p th:if="${searchResults.isEmpty()}" style="color: #666; font-size: 0.9rem;">No users found matching that name.</p>
+    <div th:each="resultUser : ${searchResults}" class="search-result-row">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <img th:src="${resultUser.profilePictureUrl != null ? resultUser.profilePictureUrl : '/css/default-avatar.png'}" class="post-avatar">
+        <span style="font-weight: 600;" th:text="${resultUser.username}">username</span>
+      </div>
+      <a th:href="@{'/profile/' + ${resultUser.username}}" class="btn-view-profile">View Profile</a>
+    </div>
+  </div>
+
+  <div th:if="${posts.isEmpty()}" class="empty-feed">
+    <h3>No posts yet!</h3>
+    <p>Be the first one to capture a moment and share it with the world.</p>
+  </div>
+
+  <article th:each="post : ${posts}" class="post-card" th:data-postid="${post.id}">
+    <header class="post-header" style="justify-content: space-between;">
+      <a th:href="@{'/profile/' + ${post.user.username}}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;">
+        <img th:src="${post.user.profilePictureUrl != null ? post.user.profilePictureUrl : '/css/default-avatar.png'}" class="post-avatar" alt="User Avatar">
+        <span class="post-username" th:text="${post.user.username}">username</span>
+      </a>
+      <button th:if="${currentUser.username == post.user.username}" th:data-id="${post.id}" th:data-caption="${post.caption}" onclick="openEditModal(this)" style="background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+        Edit
+      </button>
+    </header>
+
+    <div th:if="${!post.imageUrls.isEmpty()}" style="position: relative;">
+      <div class="carousel-container" onscroll="updateCarouselIndicator(this)">
+        <div th:each="imgUrl : ${post.imageUrls}" class="carousel-item">
+          <img th:src="${imgUrl}" class="post-image" alt="Post Content">
+        </div>
+      </div>
+      <div th:if="${post.imageUrls.size() > 1}" class="carousel-indicator" th:text="'1 / ' + ${post.imageUrls.size()}"></div>
+    </div>
+
+    <div th:if="${post.imageUrls.isEmpty()}" style="padding: 0.5rem 1.25rem 0.5rem 1.25rem;">
+      <p style="font-size: 1.15rem; font-weight: 400; line-height: 1.5; color: #0f1419; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; margin: 0;" th:id="'post-caption-' + ${post.id}" th:text="${post.caption}"></p>
+    </div>
+
+    <div class="post-actions" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+      <div style="display: flex; justify-content: space-between;">
+        <div class="action-left" style="display: flex; gap: 1rem;">
+          <form th:action="@{'/post/' + ${post.id} + '/like'}" method="POST">
+            <button type="submit" class="action-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">
+              <span th:if="${post.isLikedBy(currentUser)}">❤️</span>
+              <span th:unless="${post.isLikedBy(currentUser)}">🤍</span>
+            </button>
+          </form>
+          <button class="action-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">💬</button>
+        </div>
+        <button class="action-btn" th:data-postid="${post.id}" onclick="toggleSave(this.getAttribute('data-postid'), this)" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">
+          <span th:text="${savedPostIds != null and savedPostIds.contains(post.id) ? '🔖' : '📑'}">📑</span>
+        </button>
+      </div>
+      <div style="font-weight: 600; font-size: 0.95rem; cursor: pointer;" th:data-id="${post.id}" onclick="showLikes('post', this.getAttribute('data-id'))">
+        <span th:text="${post.likedByUsers.size()}">0</span> likes
+      </div>
+    </div>
+
+    <div class="post-body" th:if="${!post.imageUrls.isEmpty()}">
+      <p>
+        <strong th:text="${post.user.username}">username</strong>
+        <span th:id="'post-caption-' + ${post.id}" th:text="${post.caption}">Caption</span>
+      </p>
+      <div class="post-hashtags">
+        <span th:each="hashtag : ${post.hashtags}" th:text="'#' + ${hashtag.name} + ' '" class="hashtag">#tag</span>
+      </div>
+      <span class="post-time" th:text="${#temporals.format(post.createdAt, 'dd MMMM yyyy')}">Date</span>
+    </div>
+
+    <div class="post-body" th:if="${post.imageUrls.isEmpty()}" style="padding-top: 0;">
+      <div class="post-hashtags" th:if="${!post.hashtags.isEmpty()}" style="margin-bottom: 0.5rem;">
+        <span th:each="hashtag : ${post.hashtags}" th:text="'#' + ${hashtag.name} + ' '" class="hashtag">#tag</span>
+      </div>
+      <span class="post-time" th:text="${#temporals.format(post.createdAt, 'dd MMMM yyyy')}">Date</span>
+    </div>
+
+    <div th:replace="~{fragments/comments :: comments-block(post=${post}, currentUser=${currentUser})}"></div>
+  </article>
+</main>
+
+<div id="editPostModal" class="modal-overlay" onclick="closeModal(event, this)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>Edit Post</span>
+      <button onclick="closeModalDirect('editPostModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="editPostForm" onsubmit="submitPostEdit(event)">
+        <input type="hidden" id="editPostId">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Caption & Hashtags</label>
+          <textarea id="editPostCaption" rows="6" style="width: 100%; border: 1px solid #dbdbdb; border-radius: 6px; padding: 10px; resize: vertical; font-family: inherit;"></textarea>
+        </div>
+        <button type="submit" id="saveEditBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="storyViewerOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 9999; flex-direction: column;">
+  <div id="storyProgressContainer" style="display: flex; gap: 4px; padding: 10px; position: absolute; top: 0; width: 100%; z-index: 10001; box-sizing: border-box;"></div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 25px 15px 10px 15px; position: absolute; top: 10px; width: 100%; z-index: 10001; box-sizing: border-box; background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);">
+    <div style="display: flex; align-items: center; gap: 10px; color: white;">
+      <img id="storyAvatar" src="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+      <span id="storyUsername" style="font-weight: 600; font-size: 0.9rem; text-shadow: 1px 1px 2px black;"></span>
+    </div>
+    <button onclick="closeStoryViewer()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; text-shadow: 1px 1px 2px black;">✕</button>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; align-items: center; position: relative;">
+    <video id="storyVideo" style="display: none; width: 100%; height: 100%; object-fit: cover;" playsinline></video>
+    <img id="storyImage" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+    <div id="tapLeft" style="position: absolute; left: 0; top: 0; width: 30%; height: 100%; z-index: 10000;"></div>
+    <div id="tapRight" style="position: absolute; right: 0; top: 0; width: 70%; height: 100%; z-index: 10000;"></div>
+  </div>
+
+  <div id="storyViewerActions" style="display: none; position: absolute; bottom: 20px; right: 20px; z-index: 10001;">
+    <button id="storyLikeBtn" onclick="likeCurrentStory()" style="background: none; border: none; font-size: 2rem; cursor: pointer; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)); transition: transform 0.2s;">🤍</button>
+  </div>
+
+  <div id="storyOwnerStats" style="display: none; position: absolute; bottom: 20px; left: 20px; color: white; z-index: 10001; text-shadow: 1px 1px 2px black; cursor: pointer;" onclick="toggleStoryDetails()">
+    <span style="font-size: 1.2rem;">👁️</span> <span id="storyViewCount" style="font-weight: bold;">0</span> views <span style="font-size: 0.8rem; margin-left: 5px;">(Tap to view)</span>
+  </div>
+
+  <div id="storyDetailsPanel" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; z-index: 10002; padding: 20px; box-sizing: border-box; overflow-y: auto; color: black; box-shadow: 0px -5px 15px rgba(0,0,0,0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0;">Story Details</h3>
+      <button onclick="toggleStoryDetails()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <h4 style="margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">❤️ Liked By</h4>
+    <div id="storyLikersList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;"></div>
+    <h4 style="margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">👁️ Viewed By</h4>
+    <div id="storyViewersList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+  </div>
+</div>
+
+<script th:inline="javascript">
+  // --- FEED & POST SCRIPTS ---
+  function updateCarouselIndicator(container) {
+    const wrapper = container.parentElement;
+    const indicator = wrapper.querySelector('.carousel-indicator');
+    if (indicator) {
+      const currentIndex = Math.round(container.scrollLeft / container.clientWidth);
+      const totalImages = container.children.length;
+      indicator.innerText = (currentIndex + 1) + ' / ' + totalImages;
+    }
+  }
+
+  function toggleSave(postId, btnElement) {
+    fetch('/api/posts/' + postId + '/save', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    })
+            .then(res => res.json())
+            .then(data => {
+              const iconSpan = btnElement.querySelector('span');
+              if (iconSpan) { iconSpan.innerText = data.saved ? '🔖' : '📑'; }
+            })
+            .catch(err => console.error('Save failed:', err));
+  }
+
+  function uploadStory(inputElement) {
+    if (!inputElement.files || inputElement.files.length === 0) return;
+    const file = inputElement.files[0];
+    const formData = new FormData();
+    formData.append('media', file);
+
+    const indicator = document.getElementById('storyUploadIndicator');
+    const textLabel = document.getElementById('storyUploadText');
+    indicator.innerHTML = '↻';
+    indicator.style.background = '#888';
+    textLabel.innerText = 'Uploading...';
+    inputElement.disabled = true;
+
+    fetch('/api/stories/create', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken },
+      body: formData
+    })
+            .then(res => {
+              if (res.ok) { window.location.reload(); }
+              else {
+                alert('Failed to upload story.');
+                resetStoryUploadUI(inputElement, indicator, textLabel);
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              alert('Error occurred.');
+              resetStoryUploadUI(inputElement, indicator, textLabel);
+            });
+  }
+
+  function resetStoryUploadUI(inputElement, indicator, textLabel) {
+    inputElement.value = '';
+    inputElement.disabled = false;
+    indicator.innerHTML = '+';
+    indicator.style.background = '#0095f6';
+    textLabel.innerText = 'Your Story';
+  }
+
+  function openEditModal(btnElement) {
+    const postId = btnElement.getAttribute('data-id');
+    const currentCaption = btnElement.getAttribute('data-caption');
+    document.getElementById('editPostId').value = postId;
+    document.getElementById('editPostCaption').value = currentCaption || "";
+    document.getElementById('editPostModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function submitPostEdit(event) {
+    event.preventDefault();
+    const postId = document.getElementById('editPostId').value;
+    const newCaption = document.getElementById('editPostCaption').value;
+    const saveBtn = document.getElementById('saveEditBtn');
+    saveBtn.innerText = "Saving...";
+    saveBtn.disabled = true;
+
+    fetch('/api/posts/' + postId + '/edit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': window.csrfToken
+      },
+      body: new URLSearchParams({ 'caption': newCaption })
+    })
+            .then(res => {
+              if (res.ok) {
+                const captionSpan = document.getElementById('post-caption-' + postId);
+                if (captionSpan) captionSpan.innerText = newCaption;
+                const editBtn = document.querySelector(`button[data-id="${postId}"]`);
+                if (editBtn) editBtn.setAttribute('data-caption', newCaption);
+                closeModalDirect('editPostModal');
+              } else {
+                alert("Failed to update post.");
+              }
+            })
+            .catch(err => console.error(err))
+            .finally(() => {
+              saveBtn.innerText = "Save Changes";
+              saveBtn.disabled = false;
+            });
+  }
+
+  function closeModalDirect(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+
+  function closeModal(event, element) {
+    if (event.target === element) {
+      element.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.viewTimer = setTimeout(() => {
+            const postId = entry.target.getAttribute('data-postid');
+            fetch(`/api/posts/${postId}/view`, {
+              method: 'POST',
+              headers: { 'X-CSRF-TOKEN': window.csrfToken }
+            }).catch(err => console.error("Telemetry failed", err));
+            observer.unobserve(entry.target);
+          }, 3000);
+        } else {
+          clearTimeout(entry.target.viewTimer);
+        }
+      });
+    }, { threshold: 0.6 });
+
+    document.querySelectorAll('.post-card').forEach(card => observer.observe(card));
+  });
+
+  // --- STORY VIEWER ENGINE SCRIPTS ---
+  let currentStories = [];
+  let currentIndex = 0;
+  let storyTimer;
+  let progressAnimation;
+  let isPaused = false;
+  let startTime;
+  let remainingTime = 5000;
+
+  const overlay = document.getElementById('storyViewerOverlay');
+  const imgEl = document.getElementById('storyImage');
+  const vidEl = document.getElementById('storyVideo');
+  const progressContainer = document.getElementById('storyProgressContainer');
+
+  function openStoryViewer(username) {
+    fetch(`/api/stories/user/${username}/active`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.length === 0) return;
+              currentStories = data;
+              currentIndex = 0;
+              document.getElementById('storyAvatar').src = data[0].userAvatar;
+              document.getElementById('storyUsername').innerText = data[0].username;
+              buildProgressBars();
+              overlay.style.display = 'flex';
+              renderCurrentStory();
+            });
+  }
+
+  function buildProgressBars() {
+    progressContainer.innerHTML = '';
+    currentStories.forEach((_, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.flex = '1';
+      wrapper.style.height = '3px';
+      wrapper.style.background = 'rgba(255,255,255,0.3)';
+      wrapper.style.borderRadius = '2px';
+      wrapper.style.overflow = 'hidden';
+      const bar = document.createElement('div');
+      bar.id = `progress-bar-${i}`;
+      bar.style.height = '100%';
+      bar.style.width = '0%';
+      bar.style.background = 'white';
+      wrapper.appendChild(bar);
+      progressContainer.appendChild(wrapper);
+    });
+  }
+
+  function renderCurrentStory() {
+    clearTimeout(storyTimer);
+    cancelAnimationFrame(progressAnimation);
+    remainingTime = 5000;
+    isPaused = false;
+
+    currentStories.forEach((_, i) => {
+      document.getElementById(`progress-bar-${i}`).style.width = i < currentIndex ? '100%' : '0%';
+    });
+
+    const story = currentStories[currentIndex];
+    const isVideo = story.mediaUrl.endsWith('.mp4') || story.mediaUrl.endsWith('.webm');
+
+    const statsDiv = document.getElementById('storyOwnerStats');
+    const actionsDiv = document.getElementById('storyViewerActions');
+    document.getElementById('storyDetailsPanel').style.display = 'none';
+
+    if (story.isOwner) {
+      statsDiv.style.display = 'block';
+      actionsDiv.style.display = 'none';
+      document.getElementById('storyViewCount').innerText = story.viewCount;
+    } else {
+      statsDiv.style.display = 'none';
+      actionsDiv.style.display = 'block';
+      document.getElementById('storyLikeBtn').innerText = story.isLikedByMe ? '❤️' : '🤍';
+      fetch(`/api/stories/${story.id}/view`, { method: 'POST', headers: { 'X-CSRF-TOKEN': window.csrfToken }});
+    }
+
+    if (isVideo) {
+      imgEl.style.display = 'none';
+      vidEl.style.display = 'block';
+      vidEl.src = story.mediaUrl;
+      vidEl.play();
+      vidEl.onloadedmetadata = () => {
+        remainingTime = vidEl.duration * 1000;
+        startProgressBar(remainingTime);
+      };
+      vidEl.onended = nextStory;
+    } else {
+      vidEl.style.display = 'none';
+      vidEl.pause();
+      imgEl.style.display = 'block';
+      imgEl.src = story.mediaUrl;
+      startProgressBar(remainingTime);
+      storyTimer = setTimeout(nextStory, remainingTime);
+    }
+  }
+
+  function likeCurrentStory() {
+    const story = currentStories[currentIndex];
+    fetch(`/api/stories/${story.id}/like`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    })
+            .then(res => res.json())
+            .then(data => {
+              story.isLikedByMe = data.liked;
+              document.getElementById('storyLikeBtn').innerText = data.liked ? '❤️' : '🤍';
+            });
+  }
+
+  function toggleStoryDetails() {
+    const panel = document.getElementById('storyDetailsPanel');
+    if (panel.style.display === 'none') {
+      isPaused = true;
+      clearTimeout(storyTimer);
+      if (vidEl.style.display === 'block') vidEl.pause();
+      panel.style.display = 'block';
+      populateStoryDetails();
+    } else {
+      panel.style.display = 'none';
+      isPaused = false;
+      if (vidEl.style.display === 'block') vidEl.play();
+      if (imgEl.style.display === 'block') storyTimer = setTimeout(nextStory, remainingTime);
+      requestAnimationFrame(time => startProgressBar(remainingTime));
+    }
+  }
+
+  function populateStoryDetails() {
+    const story = currentStories[currentIndex];
+    const likersDiv = document.getElementById('storyLikersList');
+    const viewersDiv = document.getElementById('storyViewersList');
+
+    likersDiv.innerHTML = story.likedBy.length === 0 ? '<span style="color:#888; font-size:0.9rem;">No likes yet.</span>' : '';
+    story.likedBy.forEach(u => {
+      likersDiv.innerHTML += `<div style="display:flex; align-items:center; gap:10px;"><img src="${u.avatarUrl}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;"> <span style="font-weight:600;">${u.username}</span></div>`;
+    });
+
+    viewersDiv.innerHTML = story.viewedBy.length === 0 ? '<span style="color:#888; font-size:0.9rem;">No views yet.</span>' : '';
+    story.viewedBy.forEach(u => {
+      viewersDiv.innerHTML += `<div style="display:flex; align-items:center; gap:10px;"><img src="${u.avatarUrl}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;"> <span style="font-weight:600;">${u.username}</span></div>`;
+    });
+  }
+
+  function startProgressBar(duration) {
+    startTime = performance.now();
+    const bar = document.getElementById(`progress-bar-${currentIndex}`);
+
+    function animate(currentTime) {
+      if (isPaused) {
+        startTime += (currentTime - startTime);
+      } else {
+        const elapsed = currentTime - startTime;
+        const percentage = Math.min((elapsed / duration) * 100, 100);
+        bar.style.width = percentage + '%';
+        if (percentage < 100) progressAnimation = requestAnimationFrame(animate);
+      }
+    }
+    progressAnimation = requestAnimationFrame(animate);
+  }
+
+  function nextStory() {
+    if (currentIndex < currentStories.length - 1) {
+      currentIndex++;
+      renderCurrentStory();
+    } else {
+      closeStoryViewer();
+    }
+  }
+
+  function prevStory() {
+    if (currentIndex > 0) {
+      currentIndex--;
+      renderCurrentStory();
+    } else {
+      renderCurrentStory();
+    }
+  }
+
+  function closeStoryViewer() {
+    overlay.style.display = 'none';
+    vidEl.pause();
+    vidEl.src = "";
+    clearTimeout(storyTimer);
+    cancelAnimationFrame(progressAnimation);
+    document.getElementById('storyDetailsPanel').style.display = 'none';
+  }
+
+  const tapLeft = document.getElementById('tapLeft');
+  const tapRight = document.getElementById('tapRight');
+  let holdTimer;
+
+  function handleTouchStart() {
+    holdTimer = setTimeout(() => {
+      isPaused = true;
+      if (vidEl.style.display === 'block') vidEl.pause();
+      clearTimeout(storyTimer);
+    }, 200);
+  }
+
+  function handleTouchEnd() {
+    clearTimeout(holdTimer);
+    if (isPaused && document.getElementById('storyDetailsPanel').style.display === 'none') {
+      isPaused = false;
+      if (vidEl.style.display === 'block') vidEl.play();
+      if (imgEl.style.display === 'block') storyTimer = setTimeout(nextStory, remainingTime);
+      requestAnimationFrame(time => startProgressBar(remainingTime));
+    }
+  }
+
+  [tapLeft, tapRight].forEach(zone => {
+    zone.addEventListener('mousedown', handleTouchStart);
+    zone.addEventListener('mouseup', handleTouchEnd);
+    zone.addEventListener('touchstart', handleTouchStart);
+    zone.addEventListener('touchend', handleTouchEnd);
+  });
+
+  tapLeft.addEventListener('click', (e) => { if (!isPaused) prevStory(); });
+  tapRight.addEventListener('click', (e) => { if (!isPaused) nextStory(); });
+</script>
+</body>
+</html>

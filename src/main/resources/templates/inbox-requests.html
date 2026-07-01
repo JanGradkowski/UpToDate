@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Message Requests - UpToDate</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="inbox-container">
+    <div class="inbox-header">
+        <a th:href="@{/inbox}" style="text-decoration: none; color: #1a1a1a; font-size: 1.2rem;">←</a>
+        <span>Message Requests</span>
+        <span style="width: 20px;"></span> </div>
+
+    <div style="padding: 1rem 1.5rem; color: #888; font-size: 0.85rem; text-align: center; border-bottom: 1px solid #efefef;">
+        Open a chat to get more info about who's messaging you. They won't know you've seen it until you accept.
+    </div>
+
+    <div th:if="${requests.isEmpty()}" style="padding: 3rem; text-align: center; color: #888;">
+        <p>No pending message requests.</p>
+    </div>
+
+    <a th:each="req : ${requests}"
+       th:with="initiator=${req.initiator}"
+       th:href="@{'/direct/' + ${initiator.username}}"
+       class="inbox-row">
+
+        <img th:src="${initiator.profilePictureUrl != null ? initiator.profilePictureUrl : '/css/default-avatar.png'}" class="inbox-avatar">
+
+        <div class="inbox-text">
+            <div class="inbox-username" th:text="${initiator.username}">Username</div>
+            <div class="inbox-preview" th:text="${initiator.followers.size()} + ' followers'">Follower info</div>
+        </div>
+    </a>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,94 @@
+  <!DOCTYPE html>
+  <html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Up Your Profile - UpToDate</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+  </head>
+  <nav class="navbar">
+    <div class="logo"><a th:href="@{/}" style="color: inherit; text-decoration: none;">UpToDate</a></div>
+  </nav>
+
+  <main class="hero auth-hero">
+    <div class="auth-container" style="max-width: 550px;">
+      <h2>Customize Your Profile</h2>
+      <p class="auth-subtitle">Let everyone know who you are.</p>
+
+      <form th:action="@{/setup}" method="POST" enctype="multipart/form-data" class="auth-form">
+
+        <div class="form-group avatar-upload-group">
+          <label>Profile Picture</label>
+          <div class="avatar-preview-container" onclick="document.getElementById('profilePic').click()">
+            <div id="avatarPlaceholder" class="avatar-placeholder">
+              <span style="font-size: 2rem;">+</span>
+              <span style="font-size: 0.8rem; margin-top: 5px;">Upload</span>
+            </div>
+            <img id="imagePreview" src="#" alt="Preview" style="display: none;">
+          </div>
+          <input type="file" id="profilePic" name="profilePic" accept="image/*" required style="display: none;" onchange="previewImage(event)">
+        </div>
+
+        <div class="form-group">
+          <label for="bio">Bio</label>
+          <textarea id="bio" name="bio" rows="3" placeholder="Tell us about yourself..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>What are you interested in?</label>
+          <p class="field-hint">Select topics to tune your feed.</p>
+
+          <div class="interests-grid">
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Photography">
+              <span>Photography</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Travel">
+              <span>Travel</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Technology">
+              <span>Technology</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Fashion">
+              <span>Fashion</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Food">
+              <span>Food</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Sports">
+              <span>Sports</span>
+            </label>
+            <label class="interest-pill">
+              <input type="checkbox" name="interests" value="Art">
+              <span>Art & Design</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary auth-submit">Complete Setup</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    function previewImage(event) {
+      const reader = new FileReader();
+      reader.onload = function() {
+        const output = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('avatarPlaceholder');
+
+        output.src = reader.result;
+        output.style.display = 'block';
+        placeholder.style.display = 'none';
+      }
+      if(event.target.files[0]) {
+        reader.readAsDataURL(event.target.files[0]);
+      }
+    }
+  </script>
+  </html>

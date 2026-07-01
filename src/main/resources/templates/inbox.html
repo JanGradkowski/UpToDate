@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Inbox - UpToDate</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="inbox-container">
+    <div class="inbox-header">
+        <span th:text="${currentUser.username}">My Inbox</span>
+        <a th:href="@{/inbox/requests}" style="text-decoration: none; color: #0095f6; font-size: 0.95rem;">Requests</a>
+    </div>
+
+    <div th:if="${conversations.isEmpty()}" style="padding: 3rem; text-align: center; color: #888;">
+        <h3>No messages found</h3>
+        <p>Send private photos and messages to a friend or group.</p>
+    </div>
+
+    <a th:each="convo : ${conversations}"
+       th:with="otherUser=${convo.participants.get(0).username == currentUser.username ? convo.participants.get(1) : convo.participants.get(0)},
+                lastMsg=${convo.messages.isEmpty() ? null : convo.messages.get(convo.messages.size() - 1)}"
+       th:href="@{'/direct/' + ${otherUser.username}}"
+       class="inbox-row">
+
+        <img th:src="${otherUser.profilePictureUrl != null ? otherUser.profilePictureUrl : '/css/default-avatar.png'}" class="inbox-avatar">
+
+        <div class="inbox-text">
+            <div class="inbox-username" th:text="${otherUser.username}">Username</div>
+
+            <div class="inbox-preview" th:if="${lastMsg == null}">Tap to chat</div>
+
+            <div class="inbox-preview" th:if="${lastMsg != null and lastMsg.type.name() == 'TEXT'}" th:text="${lastMsg.content}">Latest message snippet...</div>
+            <div class="inbox-preview" th:if="${lastMsg != null and lastMsg.type.name() == 'IMAGE'}">📷 Photo</div>
+            <div class="inbox-preview" th:if="${lastMsg != null and lastMsg.type.name() == 'VIDEO'}">🎬 Video</div>
+            <div class="inbox-preview" th:if="${lastMsg != null and lastMsg.type.name() == 'GIF'}">GIF</div>
+            <div class="inbox-preview" th:if="${lastMsg != null and lastMsg.type.name() == 'VOICE'}">🎤 Voice message</div>
+        </div>
+    </a>
+</main>
+
+</body>
+</html>

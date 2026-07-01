@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${appName} + ' - Welcome'">UpToDate</title>
+
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="logo" th:text="${appName}">UpToDate</div>
+    <div class="nav-links">
+        <a href="#">About</a>
+        <a href="#">Features</a>
+        <a href="#">Support</a>
+    </div>
+</nav>
+
+<main class="hero">
+    <div class="hero-content">
+        <h1 th:text="${appName}">UpToDate</h1>
+        <p class="tagline" th:text="${tagline}">Connect with friends and the world around you.</p>
+
+        <div class="action-buttons">
+            <a th:href="@{/login}" class="btn btn-primary">Log In</a>
+            <a th:href="@{/signup}" class="btn btn-secondary">Sign Up</a>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <p>&copy; 2026 UpToDate. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

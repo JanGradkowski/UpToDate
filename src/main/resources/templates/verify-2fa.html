@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UpToDate - Verify 2FA</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="logo"><a th:href="@{/static}" style="color: inherit; text-decoration: none;">UpToDate</a></div>
+</nav>
+
+<main class="hero auth-hero">
+    <div class="auth-container" style="text-align: center;">
+        <h2>Two-Factor Authentication</h2>
+        <p class="auth-subtitle">Enter the 6-digit code from your authenticator app.</p>
+
+        <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+
+        <form th:action="@{/verify-2fa}" method="POST" class="auth-form" style="text-align: left;">
+            <div class="form-group">
+                <input type="text" name="code" placeholder="000000" maxlength="6" required autocomplete="off" style="text-align: center; letter-spacing: 10px; font-size: 1.5rem; font-weight: 700;">
+            </div>
+
+            <button type="submit" class="btn btn-primary auth-submit">Verify</button>
+        </form>
+
+        <p class="auth-switch" style="margin-top: 1rem;"><a th:href="@{/login}">Back to Login</a></p>
+    </div>
+</main>
+
+</body>
+</html>

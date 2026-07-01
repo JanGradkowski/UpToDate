@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'Chat with ' + ${targetUser.username}">Direct Message</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="chat-container">
+    <div class="chat-header">
+        <a th:href="@{/inbox}" style="text-decoration: none; color: #1a1a1a; font-size: 1.2rem; margin-right: 0.5rem;">←</a>
+        <img th:src="${targetUser.profilePictureUrl != null ? targetUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+        <a th:href="@{'/profile/' + ${targetUser.username}}" style="text-decoration: none; color: inherit;">
+            <strong th:text="${targetUser.username}">Username</strong>
+        </a>
+    </div>
+
+    <div id="chatBox" class="chat-messages">
+        <div style="text-align: center; padding: 2rem 0;">
+            <img th:src="${targetUser.profilePictureUrl != null ? targetUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 0.5rem;">
+            <h3 th:text="${targetUser.username}" style="margin: 0;">Username</h3>
+            <p style="color: #888; font-size: 0.9rem; margin-top: 4px;" th:text="${targetUser.followers.size()} + ' followers'">0 followers</p>
+            <a th:href="@{'/profile/' + ${targetUser.username}}" class="btn" style="background: #efefef; color: black; padding: 5px 15px; font-size: 0.85rem; margin-top: 10px; display: inline-block;">View Profile</a>
+        </div>
+
+        <div th:if="${conversation != null}">
+                <div th:each="msg: ${conversation.messages}"
+                     th:class="${msg.sender.id == currentUserid ? 'message-bubble message-sent' : 'message-bubble message-received'}"
+                     th:classappend="${(msg.type.name() == 'GIF' || msg.type.name() == 'IMAGE' || msg.type.name() == 'VIDEO') && msg.content.trim().isEmpty() ? ' media-only-bubble' : ''}"
+                     style="margin-bottom: 5px;">
+                <!-- TEXT messages: unchanged behavior -->
+                <span th:if="${msg.type.name() == 'TEXT'}" th:text="${msg.content}">Message text here</span>
+
+                <!-- IMAGE -->
+                <div th:if="${msg.type.name() == 'IMAGE'}">
+                    <img th:src="${msg.mediaUrl}" class="chat-media-image" alt="Photo" onclick="openMediaViewer(this.src, 'image')">
+                    <div th:if="${msg.content != null}" th:text="${msg.content}" style="margin-top: 6px; font-size: 0.9rem;"></div>
+                </div>
+
+                <!-- GIF -->
+                <div th:if="${msg.type.name() == 'GIF'}">
+                    <img th:src="${msg.mediaUrl}" class="chat-media-image" alt="GIF">
+                </div>
+
+                <!-- VIDEO -->
+                <div th:if="${msg.type.name() == 'VIDEO'}">
+                    <video th:src="${msg.mediaUrl}" class="chat-media-video" controls preload="metadata"></video>
+                    <div th:if="${msg.content != null}" th:text="${msg.content}" style="margin-top: 6px; font-size: 0.9rem;"></div>
+                </div>
+
+                <!-- VOICE -->
+                <div th:if="${msg.type.name() == 'VOICE'}" class="voice-message">
+                    <button type="button" class="voice-play-btn" onclick="toggleVoicePlayback(this)">▶</button>
+                    <audio th:src="${msg.mediaUrl}" preload="metadata"></audio>
+                    <div class="voice-waveform-static"></div>
+                    <span class="voice-duration" th:if="${msg.durationSeconds != null}" th:text="${#numbers.formatInteger(msg.durationSeconds / 60, 1)} + ':' + ${#numbers.formatInteger(msg.durationSeconds % 60, 2)}">0:00</span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-input-area" style="flex-direction: column; gap: 0.5rem;">
+
+        <div th:if="${conversation != null and conversation.pending and conversation.initiator.id != currentUser.id}" style="width: 100%; text-align: center;">
+            <p style="font-size: 0.85rem; color: #888; margin-bottom: 0.5rem;">Accept message request from <span th:text="${targetUser.username}"></span>?</p>
+            <form th:action="@{'/direct/accept/' + ${conversation.id}}" method="POST">
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Accept Request</button>
+            </form>
+        </div>
+
+        <div th:unless="${conversation != null and conversation.pending and conversation.initiator.id != currentUser.id}" style="width: 100%;">
+
+            <!-- Pending attachment preview (shown before sending an image/video) -->
+            <div id="attachmentPreview" style="display: none; padding: 0.5rem; background: #f0f4f8; border-radius: 10px; margin-bottom: 0.5rem; align-items: center; gap: 0.75rem;">
+                <img id="attachmentPreviewImg" style="display: none; max-height: 60px; border-radius: 6px;">
+                <video id="attachmentPreviewVideo" style="display: none; max-height: 60px; border-radius: 6px;" muted></video>
+                <span id="attachmentPreviewLabel" style="flex: 1; font-size: 0.85rem; color: #555;"></span>
+                <button type="button" onclick="clearAttachment()" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #888;">✕</button>
+            </div>
+
+            <!-- Voice recording bar (shown while recording) -->
+            <div id="recordingBar" style="display: none; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: #fff0f0; border-radius: 24px; margin-bottom: 0.5rem;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: #b21f1f; display: inline-block; animation: pulseRec 1s infinite;"></span>
+                <span id="recordingTimer" style="font-weight: 600; color: #b21f1f;">0:00</span>
+                <span style="flex: 1; color: #888; font-size: 0.85rem;">Recording voice message...</span>
+                <button type="button" onclick="cancelRecording()" style="background: none; border: none; color: #888; font-weight: 600; cursor: pointer;">Cancel</button>
+                <button type="button" onclick="stopRecording()" class="btn btn-primary" style="padding: 4px 14px; font-size: 0.85rem;">Send</button>
+            </div>
+
+            <form id="textMessageForm" th:action="@{'/direct/' + ${targetUser.username} + '/send'}" method="POST" style="display: flex; gap: 0.5rem; align-items: center;">
+
+                <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleAttachmentChosen(event, 'image')">
+                <input type="file" id="videoInput" accept="video/*" style="display: none;" onchange="handleAttachmentChosen(event, 'video')">
+
+                <button type="button" class="chat-icon-btn" title="Send a photo" onclick="document.getElementById('imageInput').click()">🖼️</button>
+                <button type="button" class="chat-icon-btn" title="Send a video" onclick="document.getElementById('videoInput').click()">🎬</button>
+                <button type="button" class="chat-icon-btn" title="Send a GIF" onclick="openGifPicker()">GIF</button>
+
+                <input type="text" name="text" id="textInput" class="chat-input" placeholder="Message..." autocomplete="off" oninput="toggleSendBtn(this)">
+
+                <button type="button" id="micBtn" class="chat-icon-btn" title="Record a voice message" onclick="startRecording()">🎤</button>
+                <button type="submit" id="sendBtn" class="chat-send-btn" disabled>Send</button>
+            </form>
+        </div>
+
+    </div>
+</main>
+
+<!-- Fullscreen media viewer for tapping an image -->
+<div id="mediaViewerOverlay" class="modal-overlay" onclick="closeMediaViewer(event)">
+    <img id="mediaViewerImg" style="max-width: 90vw; max-height: 90vh; border-radius: 8px; display: none;">
+</div>
+
+<!-- GIF picker modal -->
+<div id="gifPickerOverlay" class="modal-overlay" onclick="closeGifPickerOnOverlay(event)">
+    <div class="modal-content" onclick="event.stopPropagation()" style="width: 420px;">
+        <div class="modal-header">
+            <span>Send a GIF</span>
+            <button onclick="closeGifPicker()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+        </div>
+        <div class="modal-body" style="padding-top: 0.5rem;">
+            <input type="text" id="gifSearchInput" placeholder="Search KLIPY" oninput="debouncedGifSearch()" style="width: 100%; padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #dbdbdb; margin-bottom: 0.75rem;">
+            <!-- KLIPY's attribution guidelines ask integrators to credit them
+                 visibly in the picker UI - confirm exact wording/logo asset
+                 requirements at https://docs.klipy.com/attribution before
+                 shipping, this is a reasonable-effort placeholder. -->
+            <div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-bottom: 0.5rem;">Powered by KLIPY</div>
+            <div id="gifResultsGrid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-height: 50vh; overflow-y: auto;">
+                <div style="grid-column: span 2; text-align: center; color: #888; padding: 2rem 0;">Type to search for GIFs.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .chat-icon-btn {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 0.3rem;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .chat-media-image {
+        max-width: 220px;
+        max-height: 280px;
+        border-radius: 12px;
+        display: block;
+        cursor: pointer;
+        object-fit: cover;
+    }
+    .chat-media-video {
+        max-width: 240px;
+        max-height: 280px;
+        border-radius: 12px;
+        display: block;
+    }
+    .voice-message {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        min-width: 160px;
+    }
+    .voice-play-btn {
+        background: rgba(255,255,255,0.25);
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 0.8rem;
+    }
+    .message-received .voice-play-btn {
+        background: #dbeafe;
+    }
+    .voice-waveform-static {
+        flex: 1;
+        height: 18px;
+        background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px);
+        opacity: 0.5;
+        border-radius: 4px;
+    }
+    .voice-duration {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        flex-shrink: 0;
+    }
+    @keyframes pulseRec {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .gif-result-thumb {
+        width: 100%;
+        border-radius: 8px;
+        cursor: pointer;
+        display: block;
+        aspect-ratio: 1/1;
+        object-fit: cover;
+    }
+</style>
+
+<script th:inline="javascript">
+    // 1. Always scroll to the bottom so the newest messages are visible
+    const chatBox = document.getElementById("chatBox");
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    const targetUsername = /*[[${targetUser.username}]]*/ '';
+    const csrfToken = window.csrfToken; // set by the navbar fragment's inline script
+
+    // 2. Only enable the Send button if they actually typed something
+    function toggleSendBtn(input) {
+        const btn = document.getElementById("sendBtn");
+        btn.disabled = input.value.trim().length === 0;
+    }
+
+    // ---------------------------------------------------------------
+    // Image / video attachment flow
+    // ---------------------------------------------------------------
+    let pendingAttachment = null; // { file, kind }
+
+    function handleAttachmentChosen(event, kind) {
+        const file = event.target.files[0];
+        if (!file) return;
+        pendingAttachment = { file, kind };
+
+        const preview = document.getElementById('attachmentPreview');
+        const img = document.getElementById('attachmentPreviewImg');
+        const video = document.getElementById('attachmentPreviewVideo');
+        const label = document.getElementById('attachmentPreviewLabel');
+
+        img.style.display = 'none';
+        video.style.display = 'none';
+
+        const url = URL.createObjectURL(file);
+        if (kind === 'image') {
+            img.src = url;
+            img.style.display = 'block';
+        } else {
+            video.src = url;
+            video.style.display = 'block';
+        }
+        label.textContent = file.name + ' — ready to send';
+        preview.style.display = 'flex';
+
+        // Let the user add a caption in the text box, then Send submits both.
+        document.getElementById('sendBtn').disabled = false;
+    }
+
+    function clearAttachment() {
+        pendingAttachment = null;
+        document.getElementById('attachmentPreview').style.display = 'none';
+        document.getElementById('imageInput').value = '';
+        document.getElementById('videoInput').value = '';
+        toggleSendBtn(document.getElementById('textInput'));
+    }
+
+    document.getElementById('textMessageForm').addEventListener('submit', function (e) {
+        if (pendingAttachment) {
+            e.preventDefault();
+            sendAttachment();
+        }
+        // Otherwise: normal text-only form submit proceeds as before.
+    });
+
+    function sendAttachment() {
+        const sendBtn = document.getElementById('sendBtn');
+        const caption = document.getElementById('textInput').value;
+        const formData = new FormData();
+        formData.append('file', pendingAttachment.file);
+        formData.append('kind', pendingAttachment.kind);
+        if (caption) formData.append('caption', caption);
+
+        sendBtn.disabled = true;
+
+        fetch(`/api/direct/${encodeURIComponent(targetUsername)}/send-media`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            body: formData
+        }).then(res => {
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                return res.text().then(msg => { throw new Error(msg || 'Upload failed.'); });
+            }
+        }).catch(err => {
+            alert(err.message);
+            sendBtn.disabled = false;
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // Voice recording flow (MediaRecorder API)
+    // ---------------------------------------------------------------
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recordingStartTime = null;
+    let recordingTimerInterval = null;
+    let recordingCancelled = false;
+
+    async function startRecording() {
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            alert('Voice recording is not supported in this browser.');
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recordedChunks = [];
+            recordingCancelled = false;
+
+            // audio/webm with opus codec - this is what MediaValidationService
+            // expects and sniffs for on the server side.
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus' : 'audio/webm';
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                if (recordingCancelled) return;
+                finalizeRecording();
+            };
+
+            mediaRecorder.start();
+            recordingStartTime = Date.now();
+            document.getElementById('recordingBar').style.display = 'flex';
+            document.getElementById('recordingTimer').textContent = '0:00';
+            recordingTimerInterval = setInterval(updateRecordingTimer, 250);
+
+        } catch (err) {
+            alert('Microphone access was denied or is unavailable.');
+        }
+    }
+
+    function updateRecordingTimer() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('recordingTimer').textContent = mins + ':' + String(secs).padStart(2, '0');
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        cleanupRecordingUI();
+    }
+
+    function cancelRecording() {
+        recordingCancelled = true;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        cleanupRecordingUI();
+    }
+
+    function cleanupRecordingUI() {
+        clearInterval(recordingTimerInterval);
+        document.getElementById('recordingBar').style.display = 'none';
+    }
+
+    function finalizeRecording() {
+        const durationSeconds = Math.round((Date.now() - recordingStartTime) / 1000);
+        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+
+        const formData = new FormData();
+        formData.append('file', blob, 'voice-message.webm');
+        formData.append('kind', 'voice');
+        formData.append('durationSeconds', durationSeconds);
+
+        fetch(`/api/direct/${encodeURIComponent(targetUsername)}/send-media`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            body: formData
+        }).then(res => {
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                return res.text().then(msg => { throw new Error(msg || 'Could not send voice message.'); });
+            }
+        }).catch(err => alert(err.message));
+    }
+
+    function toggleVoicePlayback(btn) {
+        const audio = btn.parentElement.querySelector('audio');
+        if (audio.paused) {
+            // Pause any other playing voice messages first
+            document.querySelectorAll('.voice-message audio').forEach(a => {
+                if (a !== audio) { a.pause(); a.currentTime = 0; }
+            });
+            document.querySelectorAll('.voice-play-btn').forEach(b => { if (b !== btn) b.textContent = '▶'; });
+
+            audio.play();
+            btn.textContent = '⏸';
+        } else {
+            audio.pause();
+            btn.textContent = '▶';
+        }
+        audio.onended = () => { btn.textContent = '▶'; };
+    }
+
+    // ---------------------------------------------------------------
+    // Media viewer (tap to enlarge an image)
+    // ---------------------------------------------------------------
+    function openMediaViewer(src) {
+        const overlay = document.getElementById('mediaViewerOverlay');
+        const img = document.getElementById('mediaViewerImg');
+        img.src = src;
+        img.style.display = 'block';
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+    function closeMediaViewer(event) {
+        if (event.target.id === 'mediaViewerOverlay') {
+            document.getElementById('mediaViewerOverlay').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    }
+
+    let gifSearchDebounceHandle = null;
+
+    function openGifPicker() {
+        document.getElementById('gifPickerOverlay').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        document.getElementById('gifSearchInput').focus();
+        loadTrendingGifs();
+    }
+    function closeGifPicker() {
+        document.getElementById('gifPickerOverlay').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    function closeGifPickerOnOverlay(event) {
+        if (event.target.id === 'gifPickerOverlay') closeGifPicker();
+    }
+
+    function loadTrendingGifs() {
+        fetch('/api/gifs/trending')
+            .then(res => res.json())
+            .then(renderGifResults)
+            .catch(() => renderGifEmptyState());
+    }
+
+    function debouncedGifSearch() {
+        clearTimeout(gifSearchDebounceHandle);
+        gifSearchDebounceHandle = setTimeout(() => {
+            const q = document.getElementById('gifSearchInput').value.trim();
+            if (!q) { loadTrendingGifs(); return; }
+            fetch('/api/gifs/search?q=' + encodeURIComponent(q))
+                .then(res => res.json())
+                .then(renderGifResults)
+                .catch(() => renderGifEmptyState());
+        }, 350);
+    }
+
+    function renderGifResults(results) {
+        const grid = document.getElementById('gifResultsGrid');
+        if (!results || results.length === 0) {
+            renderGifEmptyState();
+            return;
+        }
+        grid.innerHTML = '';
+        results.forEach(gif => {
+            const img = document.createElement('img');
+            img.className = 'gif-result-thumb';
+            img.src = gif.previewUrl;
+            img.alt = gif.description || 'GIF';
+            img.onclick = () => sendGif(gif.fullUrl);
+            grid.appendChild(img);
+        });
+    }
+
+    function renderGifEmptyState() {
+        document.getElementById('gifResultsGrid').innerHTML =
+            '<div style="grid-column: span 2; text-align: center; color: #888; padding: 2rem 0;">No GIFs available right now.</div>';
+    }
+
+    function sendGif(gifUrl) {
+        const formData = new URLSearchParams({ gifUrl });
+        closeGifPicker();
+        fetch(`/api/direct/${encodeURIComponent(targetUsername)}/send-gif`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: formData
+        }).then(res => {
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                return res.text().then(msg => { throw new Error(msg || 'Could not send GIF.'); });
+            }
+        }).catch(err => alert(err.message));
+    }
+</script>
+
+</body>
+</html>

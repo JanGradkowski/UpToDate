@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - UpToDate</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="settings-container">
+
+  <aside class="settings-sidebar">
+    <div class="settings-tab active" onclick="switchTab('edit-profile', this)">Edit Profile</div>
+    <div class="settings-tab" onclick="switchTab('security', this)">Security & 2FA</div>
+    <div class="settings-tab" onclick="switchTab('privacy', this)">Privacy & Blocking</div>
+    <div class="settings-tab" onclick="switchTab('manage-posts', this)">Manage Posts</div>
+    <div class="settings-tab" style="color: #b21f1f;" onclick="switchTab('danger-zone', this)">Danger Zone</div>
+  </aside>
+
+  <section class="settings-content">
+
+    <div id="edit-profile" class="settings-section active">
+      <h2 style="margin-bottom: 2rem;">Edit Profile</h2>
+
+      <div th:if="${success}" class="alert alert-success" th:text="${success}" style="max-width: 400px; margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
+      <div th:if="${error}" class="alert alert-error" th:text="${error}" style="max-width: 400px; margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
+
+      <form th:action="@{/settings/profile}" method="POST" enctype="multipart/form-data" class="auth-form" style="max-width: 400px;">
+
+        <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem;">
+          <img id="settingsProfilePreview" th:src="${currentUser.profilePictureUrl != null ? currentUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+          <div>
+            <h3 th:text="${currentUser.username}" style="margin: 0; font-size: 1.2rem;">Username</h3>
+            <input type="file" id="profilePicInput" name="profilePic" accept="image/*" style="display: none;" onchange="previewSettingsImage(event)">
+            <button type="button" onclick="document.getElementById('profilePicInput').click()" style="color: #0095f6; background: none; border: none; font-weight: 600; cursor: pointer; padding: 0; margin-top: 4px;">Change profile photo</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" name="username" th:value="${currentUser.username}" required>
+        </div>
+        <div class="form-group">
+          <label>Bio</label>
+          <textarea name="bio" rows="4" th:text="${currentUser.bio}"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.5rem;">Submit Changes</button>
+      </form>
+    </div>
+
+    <div id="security" class="settings-section">
+      <h2 style="margin-bottom: 2rem;">Security</h2>
+
+      <div th:if="${securitySuccess}" class="alert alert-success" th:text="${securitySuccess}" style="max-width: 400px; margin-bottom: 1rem;"></div>
+      <div th:if="${securityError}" class="alert alert-error" th:text="${securityError}" style="max-width: 400px; margin-bottom: 1rem;"></div>
+
+      <form th:action="@{/settings/password/update}" method="POST" class="auth-form" style="max-width: 400px; margin-bottom: 3rem;">
+        <h3>Change Password</h3>
+
+        <div class="form-group" style="margin-top: 1rem;">
+          <input type="password" id="oldPassword" name="oldPassword" placeholder="Current Password" required>
+        </div>
+
+        <div class="form-group">
+          <input type="password" name="newPassword" placeholder="New Password" required minlength="8">
+        </div>
+
+        <div class="form-group">
+          <input type="password" name="confirmPassword" placeholder="Confirm New Password" required minlength="8">
+        </div>
+
+        <div class="form-group" id="verificationGroup" style="display: none;">
+          <label style="color: #2e7d32;">Check your email!</label>
+          <input type="text" name="verificationCode" placeholder="Enter 6-digit code">
+        </div>
+
+        <button type="button" id="sendCodeBtn" class="btn btn-secondary" onclick="requestPasswordCode()" style="padding: 0.5rem 1.5rem; width: 100%;">Send Verification Code</button>
+        <button type="submit" id="finalSubmitBtn" class="btn btn-primary" style="padding: 0.5rem 1.5rem; display: none; width: 100%;">Confirm & Change Password</button>
+      </form>
+
+      <hr style="border: 0; border-top: 1px solid #dbdbdb; margin-bottom: 2rem;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; max-width: 400px;">
+        <div>
+          <h3 style="margin: 0;">Two-Factor Authentication</h3>
+          <p style="color: #888; font-size: 0.85rem; margin: 0;">Require a code when logging in.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="twoFactorToggle" th:checked="${currentUser.twoFactorEnabled}" onchange="handle2FAToggle(this)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div id="qrSetupBox" style="display: none; max-width: 400px; margin-top: 2rem; background: #fafafa; padding: 1.5rem; border: 1px solid #dbdbdb; border-radius: 8px; text-align: center;">
+        <h4>Scan this QR Code</h4>
+        <p style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">Use Google Authenticator or Authy to scan the image below.</p>
+
+        <img id="qrCodeImage" src="" style="width: 200px; height: 200px; border: 1px solid #dbdbdb; border-radius: 8px; margin-bottom: 1rem;">
+
+        <input type="hidden" id="tempSecretKey">
+
+        <div class="form-group" style="text-align: left;">
+          <label>Enter 6-Digit Code</label>
+          <input type="text" id="twoFactorAuthCode" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 5px; font-size: 1.2rem; font-weight: 600;">
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="verifyAndEnable2FA()" style="width: 100%; margin-top: 0.5rem;">Confirm & Enable</button>
+      </div>
+    </div>
+
+    <div id="privacy" class="settings-section">
+      <h2 style="margin-bottom: 2rem;">Privacy</h2>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; max-width: 400px; margin-bottom: 3rem;">
+        <div>
+          <h3 style="margin: 0;">Private Account</h3>
+          <p style="color: #888; font-size: 0.85rem; margin: 0;">Only approved followers can see your posts.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="privateAccountToggle" th:checked="${currentUser.private}" onchange="togglePrivateAccount(this)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid #dbdbdb; margin-bottom: 2rem;">
+
+      <h3>Follow Requests</h3>
+      <div style="max-width: 420px; margin-bottom: 2rem;">
+        <div th:if="${currentUser.pendingFollowers.isEmpty()}" style="color: #888; font-size: 0.85rem;">No pending follow requests.</div>
+        <div th:each="requester : ${currentUser.pendingFollowers}" class="modal-user-row" style="justify-content: space-between; padding-left: 0; padding-right: 0;">
+          <a th:href="@{'/profile/' + ${requester.username}}" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+            <img th:src="${requester.profilePictureUrl != null ? requester.profilePictureUrl : '/css/default-avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+            <strong th:text="${requester.username}">username</strong>
+          </a>
+          <div style="display: flex; gap: 0.5rem;">
+            <form th:action="@{'/user/' + ${requester.username} + '/accept'}" method="POST">
+              <button type="submit" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.85rem;">Accept</button>
+            </form>
+            <form th:action="@{'/user/' + ${requester.username} + '/decline'}" method="POST">
+              <button type="submit" class="btn" style="background-color: #efefef; color: black; padding: 5px 12px; font-size: 0.85rem;">Decline</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <h3>Blocked Users</h3>
+      <div style="max-width: 420px;">
+        <div th:if="${currentUser.blockedUsers.isEmpty()}" style="color: #888; font-size: 0.85rem;">You have no blocked users.</div>
+        <div th:each="blockedUser : ${currentUser.blockedUsers}" class="modal-user-row" style="justify-content: space-between; padding-left: 0; padding-right: 0;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <img th:src="${blockedUser.profilePictureUrl != null ? blockedUser.profilePictureUrl : '/css/default-avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+            <strong th:text="${blockedUser.username}">username</strong>
+          </div>
+          <button type="button"
+                  th:data-username="${blockedUser.username}"
+                  onclick="unblockUser(this.getAttribute('data-username'))"
+                  class="btn"
+                  style="background-color: #efefef; color: black; padding: 5px 12px; font-size: 0.85rem;">
+            Unblock
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="manage-posts" class="settings-section">
+      <h2 style="margin-bottom: 2rem;">Manage Posts</h2>
+      <p style="color: #888;">Select a post to delete permanently.</p>
+
+      <div th:if="${currentUser.posts.isEmpty()}" style="text-align: center; color: #888; margin-top: 3rem; padding: 2rem; border: 1px solid #dbdbdb; border-radius: 8px;">
+        You haven't made any posts yet!
+      </div>
+
+      <div th:unless="${currentUser.posts.isEmpty()}" class="profile-photo-grid" style="margin-top: 2rem;">
+        <div th:each="post : ${currentUser.posts}" class="grid-image-wrapper" th:id="'manage-post-' + ${post.id}">
+          <img th:src="${post.getFirstImageUrl()}" alt="Your Post">
+
+          <button type="button" th:data-id="${post.id}" th:data-caption="${post.caption}" onclick="openEditModal(this)"
+                  style="position: absolute; top: 8px; left: 8px; background: rgba(0, 149, 246, 0.85); color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: 700; cursor: pointer; transition: background 0.2s;"
+                  onmouseover="this.style.backgroundColor='rgba(0, 149, 246, 1)'"
+                  onmouseout="this.style.backgroundColor='rgba(0, 149, 246, 0.85)'">
+            Edit
+          </button>
+
+          <button type="button" th:onclick="'deletePost(' + ${post.id} + ')'"
+                  style="position: absolute; top: 8px; right: 8px; background: rgba(178, 31, 31, 0.85); color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: 700; cursor: pointer; transition: background 0.2s;"
+                  onmouseover="this.style.backgroundColor='rgba(178, 31, 31, 1)'"
+                  onmouseout="this.style.backgroundColor='rgba(178, 31, 31, 0.85)'">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="danger-zone" class="settings-section">
+      <h2 style="margin-bottom: 2rem; color: #b21f1f;">Danger Zone</h2>
+      <p style="color: #888; margin-bottom: 2rem;">Once you delete your account, there is no going back. Please be certain.</p>
+
+      <button type="button" onclick="deleteAccount()" class="btn" style="background-color: #ffeaea; color: #b21f1f; border: 1px solid #ffc2c2; font-weight: 600; padding: 0.75rem 2rem;">
+        Delete Account
+      </button>
+    </div>
+
+  </section>
+  <div id="editPostModal" class="modal-overlay" onclick="closeModal(event, this)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span>Edit Post</span>
+        <button onclick="closeModalDirect('editPostModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="editPostForm" onsubmit="submitPostEdit(event)">
+          <input type="hidden" id="editPostId">
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Caption & Hashtags</label>
+            <textarea id="editPostCaption" rows="6" style="width: 100%; border: 1px solid #dbdbdb; border-radius: 6px; padding: 10px; resize: vertical; font-family: inherit;"></textarea>
+          </div>
+
+          <button type="submit" id="saveEditBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // Handles swapping between the tabs on the left
+  function switchTab(tabId, clickedElement) {
+    document.querySelectorAll('.settings-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+
+    document.getElementById(tabId).classList.add('active');
+    clickedElement.classList.add('active');
+  }
+  function requestPasswordCode() {
+    const oldPassword = document.getElementById('oldPassword').value;
+    if(!oldPassword) {
+      alert("Please enter your current password first.");
+      return;
+    }
+
+    const btn = document.getElementById('sendCodeBtn');
+    btn.innerText = "Sending...";
+    btn.disabled = true;
+
+    // Using standard form encoding to talk to our @RequestParam backend
+    fetch('/api/settings/password/request-code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || window.csrfToken
+        // Uses the token exposed by the navbar fragment.
+      },
+      body: new URLSearchParams({ 'oldPassword': oldPassword })
+    })
+            .then(res => {
+              if(!res.ok) throw new Error("Incorrect current password.");
+
+              // Swap the UI!
+              document.getElementById('verificationGroup').style.display = 'block';
+              document.getElementById('finalSubmitBtn').style.display = 'block';
+              btn.style.display = 'none';
+            })
+            .catch(err => {
+              alert(err.message);
+              btn.innerText = "Send Verification Code";
+              btn.disabled = false;
+            });
+  }
+
+  // Handles the instant profile picture preview
+  function previewSettingsImage(event) {
+    const reader = new FileReader();
+    reader.onload = function() {
+      const output = document.getElementById('settingsProfilePreview');
+      output.src = reader.result;
+    }
+    if(event.target.files[0]) {
+      reader.readAsDataURL(event.target.files[0]);
+    }
+  }
+  function handle2FAToggle(checkbox) {
+    if (checkbox.checked) {
+      // User turned it ON - fetch the QR code
+      fetch('/api/settings/2fa/setup', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.csrfToken }
+      })
+              .then(res => res.json())
+              .then(data => {
+                document.getElementById('qrCodeImage').src = data.qrCode;
+                document.getElementById('tempSecretKey').value = data.secret;
+                document.getElementById('qrSetupBox').style.display = 'block';
+              });
+    } else {
+      // User turned it OFF - disable in DB instantly
+      document.getElementById('qrSetupBox').style.display = 'none';
+      fetch('/api/settings/2fa/disable', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.csrfToken }
+      });
+    }
+  }
+
+  function verifyAndEnable2FA() {
+    const code = document.getElementById('twoFactorAuthCode').value;
+    const secret = document.getElementById('tempSecretKey').value;
+
+    fetch('/api/settings/2fa/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': window.csrfToken
+      },
+      body: new URLSearchParams({ 'code': code, 'secret': secret })
+    })
+            .then(res => {
+              if (res.ok) {
+                alert("Two-Factor Authentication successfully enabled!");
+                document.getElementById('qrSetupBox').style.display = 'none';
+              } else {
+                alert("Invalid code. Please try again.");
+                // Revert the toggle if they failed to verify
+                document.getElementById('twoFactorToggle').checked = false;
+              }
+            });
+  }
+  function openEditModal(btnElement) {
+    // Grab the data safely stored in the button's attributes
+    const postId = btnElement.getAttribute('data-id');
+    const currentCaption = btnElement.getAttribute('data-caption');
+
+    // Populate the modal
+    document.getElementById('editPostId').value = postId;
+    document.getElementById('editPostCaption').value = currentCaption || "";
+
+    // Show the modal
+    document.getElementById('editPostModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function submitPostEdit(event) {
+    event.preventDefault();
+
+    const postId = document.getElementById('editPostId').value;
+    const newCaption = document.getElementById('editPostCaption').value;
+    const saveBtn = document.getElementById('saveEditBtn');
+
+    saveBtn.innerText = "Saving...";
+    saveBtn.disabled = true;
+
+    fetch('/api/posts/' + postId + '/edit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': window.csrfToken
+      },
+      body: new URLSearchParams({ 'caption': newCaption })
+    })
+            .then(res => {
+              if (res.ok) {
+                // Update the data attribute on the edit button so it has the new text if opened again
+                const editBtn = document.querySelector(`button[data-id="${postId}"]`);
+                if (editBtn) editBtn.setAttribute('data-caption', newCaption);
+
+                closeModalDirect('editPostModal');
+              } else {
+                // NEW: Tell us the exact HTTP status code!
+                alert("Failed to update post. Server returned status: " + res.status);
+              }
+            })
+            .catch(err => console.error(err))
+            .finally(() => {
+              saveBtn.innerText = "Save Changes";
+              saveBtn.disabled = false;
+            });
+  }
+
+  function togglePrivateAccount(checkbox) {
+    checkbox.disabled = true;
+    fetch('/api/settings/privacy/toggle', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    })
+            .then(res => {
+              if (!res.ok) throw new Error("Unable to update privacy setting.");
+              return res.json();
+            })
+            .then(data => {
+              checkbox.checked = data.private;
+            })
+            .catch(err => {
+              checkbox.checked = !checkbox.checked;
+              alert(err.message);
+            })
+            .finally(() => {
+              checkbox.disabled = false;
+            });
+  }
+
+  function unblockUser(username) {
+    fetch('/api/users/' + username + '/unblock', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    }).then(res => {
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert("Unable to unblock this user.");
+      }
+    });
+  }
+  // Add this to the bottom of your <script> in settings.html
+  document.addEventListener("DOMContentLoaded", function() {
+    // 1. Check if the URL has a hash (e.g., #privacy)
+    const hash = window.location.hash.substring(1);
+
+    if (hash) {
+      // 2. Make sure the section actually exists on the page
+      const section = document.getElementById(hash);
+
+      if (section) {
+        // 3. Find the sidebar tab that triggers this section
+        const targetTab = document.querySelector(`.settings-tab[onclick*="'${hash}'"]`);
+
+        // 4. If we found both, switch to it!
+        if (targetTab) {
+          switchTab(hash, targetTab);
+        }
+      }
+    }
+  });
+  function deletePost(postId) {
+    if (confirm("Are you sure you want to permanently delete this post?")) {
+      fetch('/api/posts/' + postId + '/delete', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.csrfToken }
+      })
+              .then(res => {
+                if (res.ok) {
+                  // Instantly remove it from the grid without refreshing!
+                  const postElement = document.getElementById('manage-post-' + postId);
+                  if(postElement) postElement.remove();
+                } else {
+                  alert("Unable to delete post.");
+                }
+              });
+    }
+  }
+
+  function deleteAccount() {
+    if (confirm("FINAL WARNING: Are you absolutely sure you want to permanently delete your account? All your posts, followers, and likes will be lost forever.")) {
+      fetch('/api/settings/account/delete', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.csrfToken }
+      })
+              .then(res => {
+                if (res.ok) {
+                  window.location.href = '/login?logout';
+                } else {
+                  alert("An error occurred while deleting your account.");
+                }
+              });
+    }
+  }
+</script>
+
+
+</body>
+</html>

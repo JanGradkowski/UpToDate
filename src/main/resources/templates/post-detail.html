@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post by [[${post.user.username}]]</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="feed-container">
+  <article class="post-card">
+    <header class="post-header" style="justify-content: space-between;">
+      <a th:href="@{'/profile/' + ${post.user.username}}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;">
+        <img th:src="${post.user.profilePictureUrl != null ? post.user.profilePictureUrl : '/css/default-avatar.png'}" class="post-avatar" alt="User Avatar">
+        <span class="post-username" th:text="${post.user.username}">username</span>
+      </a>
+
+      <button th:if="${currentUser.username == post.user.username}"
+              th:data-id="${post.id}"
+              th:data-caption="${post.caption}"
+              onclick="openEditModal(this)"
+              style="background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+        Edit
+      </button>
+    </header>
+
+    <div th:if="${!post.imageUrls.isEmpty()}" style="position: relative;">
+      <div class="carousel-container" onscroll="updateCarouselIndicator(this)">
+        <div th:each="imgUrl : ${post.imageUrls}" class="carousel-item">
+          <img th:src="${imgUrl}" class="post-image" alt="Post Content">
+        </div>
+      </div>
+      <div th:if="${post.imageUrls.size() > 1}" class="carousel-indicator" th:text="'1 / ' + ${post.imageUrls.size()}"></div>
+    </div>
+
+    <div th:if="${post.imageUrls.isEmpty()}" style="padding: 0.5rem 1.25rem 0.5rem 1.25rem;">
+      <p style="font-size: 1.15rem; font-weight: 400; line-height: 1.5; color: #0f1419; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; margin: 0;" th:id="'post-caption-' + ${post.id}" th:text="${post.caption}"></p>
+    </div>
+
+    <div class="post-actions" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+      <div style="display: flex; justify-content: space-between;">
+        <div class="action-left" style="display: flex; gap: 1rem;">
+          <form th:action="@{'/post/' + ${post.id} + '/like'}" method="POST">
+            <button type="submit" class="action-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">
+              <span th:if="${post.isLikedBy(currentUser)}">❤️</span>
+              <span th:unless="${post.isLikedBy(currentUser)}">🤍</span>
+            </button>
+          </form>
+          <button class="action-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">💬</button>
+        </div>
+        <button class="action-btn" th:onclick="'toggleSave(' + ${post.id} + ', this)'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0;">
+          <span th:text="${savedPostIds != null and savedPostIds.contains(post.id) ? '🔖' : '📑'}">📑</span>
+        </button>
+      </div>
+
+      <div style="font-weight: 600; font-size: 0.95rem; cursor: pointer;" th:data-id="${post.id}" onclick="showLikes('post', this.getAttribute('data-id'))">
+        <span th:text="${post.likedByUsers.size()}">0</span> likes
+      </div>
+    </div>
+
+    <div class="post-body" th:if="${!post.imageUrls.isEmpty()}">
+      <p>
+        <strong th:text="${post.user.username}">username</strong>
+        <span th:id="'post-caption-' + ${post.id}" th:text="${post.caption}">This is the post caption text!</span>
+      </p>
+      <div class="post-hashtags">
+        <span th:each="hashtag : ${post.hashtags}" th:text="'#' + ${hashtag.name} + ' '" class="hashtag">#tag</span>
+      </div>
+      <span class="post-time" th:text="${#temporals.format(post.createdAt, 'dd MMMM yyyy')}">Date</span>
+    </div>
+
+    <div class="post-body" th:if="${post.imageUrls.isEmpty()}" style="padding-top: 0;">
+      <div class="post-hashtags" th:if="${!post.hashtags.isEmpty()}" style="margin-bottom: 0.5rem;">
+        <span th:each="hashtag : ${post.hashtags}" th:text="'#' + ${hashtag.name} + ' '" class="hashtag">#tag</span>
+      </div>
+      <span class="post-time" th:text="${#temporals.format(post.createdAt, 'dd MMMM yyyy')}">Date</span>
+    </div>
+
+    <div th:replace="~{fragments/comments :: comments-block(post=${post}, currentUser=${currentUser})}"></div>
+  </article>
+</main>
+<div id="editPostModal" class="modal-overlay" onclick="closeModal(event, this)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>Edit Post</span>
+      <button onclick="closeModalDirect('editPostModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="editPostForm" onsubmit="submitPostEdit(event)">
+        <input type="hidden" id="editPostId">
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Caption & Hashtags</label>
+          <textarea id="editPostCaption" rows="6" style="width: 100%; border: 1px solid #dbdbdb; border-radius: 6px; padding: 10px; resize: vertical; font-family: inherit;"></textarea>
+        </div>
+
+        <button type="submit" id="saveEditBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script th:inline="javascript">
+  function updateCarouselIndicator(container) {
+    const wrapper = container.parentElement;
+    const indicator = wrapper.querySelector('.carousel-indicator');
+    if (indicator) {
+      const currentIndex = Math.round(container.scrollLeft / container.clientWidth);
+      const totalImages = container.children.length;
+      indicator.innerText = (currentIndex + 1) + ' / ' + totalImages;
+    }
+  }
+
+  function openEditModal(btnElement) {
+    const postId = btnElement.getAttribute('data-id');
+    const currentCaption = btnElement.getAttribute('data-caption');
+
+    document.getElementById('editPostId').value = postId;
+    document.getElementById('editPostCaption').value = currentCaption || "";
+
+    document.getElementById('editPostModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function submitPostEdit(event) {
+    event.preventDefault();
+
+    const postId = document.getElementById('editPostId').value;
+    const newCaption = document.getElementById('editPostCaption').value;
+    const saveBtn = document.getElementById('saveEditBtn');
+
+    saveBtn.innerText = "Saving...";
+    saveBtn.disabled = true;
+
+    fetch('/api/posts/' + postId + '/edit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': window.csrfToken
+      },
+      body: new URLSearchParams({ 'caption': newCaption })
+    })
+            .then(res => {
+              if (res.ok) {
+                const captionSpan = document.getElementById('post-caption-' + postId);
+                if (captionSpan) {
+                  captionSpan.innerText = newCaption;
+                }
+                const editBtn = document.querySelector(`button[data-id="${postId}"]`);
+                if (editBtn) editBtn.setAttribute('data-caption', newCaption);
+                closeModalDirect('editPostModal');
+              } else {
+                alert("Failed to update post. Server returned status: " + res.status);
+              }
+            })
+            .catch(err => console.error(err))
+            .finally(() => {
+              saveBtn.innerText = "Save Changes";
+              saveBtn.disabled = false;
+            });
+  }
+
+  function closeModalDirect(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+
+  function closeModal(event, element) {
+    if (event.target === element) {
+      element.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+  }
+</script>
+<script>
+  function toggleSave(postId, btnElement) {
+    fetch('/api/posts/' + postId + '/save', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    })
+            .then(res => res.json())
+            .then(data => {
+              const iconSpan = btnElement.querySelector('span');
+              if (iconSpan) {
+                iconSpan.innerText = data.saved ? '🔖' : '📑';
+              }
+            })
+            .catch(err => console.error('Save operation failed:', err));
+  }
+</script>
+</body>
+</html>

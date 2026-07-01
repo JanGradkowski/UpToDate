@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="comments-block(post, currentUser)">
+  <hr style="border: 0; border-top: 1px solid #dbdbdb; margin: 1rem 0;">
+
+  <div class="comments-section" style="padding: 0 1rem 1rem 1rem;">
+    <h4 style="margin-bottom: 1rem;">Comments</h4>
+
+    <div style="max-height: 400px; overflow-y: auto; margin-bottom: 1rem; overflow-x: hidden;">
+
+      <div th:each="comment : ${post.comments}" th:if="${comment.parentComment == null}" style="margin-bottom: 1rem;">
+
+        <div style="display: flex; gap: 0.75rem; width: 100%;">
+          <a th:href="@{'/profile/' + ${comment.user.username}}" style = "flex-shrink: 0; display: block;">
+            <img th:src="${comment.user.profilePictureUrl != null ? comment.user.profilePictureUrl : '/css/default-avatar.png'}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; display: block;">
+          </a>
+          <div style="flex: 1;">
+            <p style="margin: 0; font-size: 0.9rem;">
+              <strong th:text="${comment.user.username}">username</strong>
+              <span th:text="${comment.text}">Comment text</span>
+            </p>
+            <div style="font-size: 0.75rem; color: #888; display: flex; gap: 1rem; margin-top: 4px;">
+              <span th:text="${#temporals.format(comment.createdAt, 'dd MMM yyyy')}">Time</span>
+
+              <!-- SECURITY FIX: Using data-id for Likes -->
+              <span th:data-id="${comment.id}" onclick="showLikes('comment', this.getAttribute('data-id'))" style="cursor: pointer; font-weight: 600;" th:text="${comment.likedByUsers.size()} + ' likes'">0 likes</span>
+
+              <!-- SECURITY FIX: Using data-id and data-user for Replies -->
+              <button th:data-id="${comment.id}" th:data-user="${comment.user.username}" onclick="prepareReply(this.getAttribute('data-id'), this.getAttribute('data-user'))" style="background: none; border: none; padding: 0; color: #888; font-weight: 600; cursor: pointer;">Reply</button>
+            </div>
+          </div>
+          <form th:action="@{'/comment/' + ${comment.id} + '/like'}" method="POST" style="margin-left: auto;">
+            <button type="submit" style="background: none; border: none; cursor: pointer; padding: 0; font-size: 0.9rem;">
+              <span th:if="${comment.isLikedBy(currentUser)}">❤️</span>
+              <span th:unless="${comment.isLikedBy(currentUser)}">🤍</span>
+            </button>
+          </form>
+        </div>
+
+        <div th:id="'replyBox-' + ${comment.id}" style="display: none; margin-left: 2.5rem; margin-top: 0.5rem;">
+          <form th:action="@{'/post/' + ${post.id} + '/comment'}" method="POST" style="display: flex; gap: 0.5rem; border-bottom: 1px solid #dbdbdb; padding-bottom: 5px;">
+            <input type="hidden" name="parentId" th:value="${comment.id}">
+            <input type="text" name="text" th:placeholder="'Reply to ' + ${comment.user.username} + '...'" required style="flex: 1; border: none; outline: none; font-size: 0.85rem; background: transparent;">
+            <button type="submit" style="background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer; font-size: 0.85rem;">Post</button>
+          </form>
+        </div>
+
+        <div th:unless="${comment.replies.isEmpty()}" style="margin-left: 2.5rem; margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+          <div th:each="reply : ${comment.replies}" style="display: flex; gap: 0.75rem;">
+            <a th:href="@{'/profile/' + ${reply.user.username}}" style = "flex-shrink: 0; display: block;">
+                <img th:src="${reply.user.profilePictureUrl != null ? reply.user.profilePictureUrl : '/css/default-avatar.png'}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block;">
+            </a>
+            <div style="flex: 1;">
+              <p style="margin: 0; font-size: 0.85rem;">
+                <strong th:text="${reply.user.username}">username</strong>
+                <span th:text="${reply.text}">Reply text</span>
+              </p>
+              <div style="font-size: 0.7rem; color: #888; display: flex; gap: 1rem; margin-top: 2px;">
+                <span th:text="${#temporals.format(reply.createdAt, 'dd MMM')}">Time</span>
+
+                <!-- SECURITY FIX: Nested Likes -->
+                <span th:data-id="${reply.id}" onclick="showLikes('comment', this.getAttribute('data-id'))" style="cursor: pointer; font-weight: 600;" th:text="${reply.likedByUsers.size()} + ' likes'">0 likes</span>
+
+                <!-- SECURITY FIX: Nested Replies -->
+                <button th:data-parent="${comment.id}" th:data-user="${reply.user.username}" onclick="prepareReply(this.getAttribute('data-parent'), this.getAttribute('data-user'))" style="background: none; border: none; padding: 0; color: #888; font-weight: 600; cursor: pointer;">Reply</button>
+              </div>
+            </div>
+            <form th:action="@{'/comment/' + ${reply.id} + '/like'}" method="POST">
+              <button type="submit" style="background: none; border: none; cursor: pointer; padding: 0; font-size: 0.8rem;">
+                <span th:if="${reply.isLikedBy(currentUser)}">❤️</span>
+                <span th:unless="${reply.isLikedBy(currentUser)}">🤍</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <p th:if="${post.comments.isEmpty()}" style="color: #888; font-size: 0.9rem;">No comments yet. Be the first!</p>
+    </div>
+
+    <form th:action="@{'/post/' + ${post.id} + '/comment'}" method="POST" style="display: flex; gap: 0.5rem; border-top: 1px solid #dbdbdb; padding-top: 1rem;">
+      <input type="text" name="text" placeholder="Add a comment..." required style="flex: 1; border: none; outline: none; font-size: 0.95rem; background: transparent;">
+      <button type="submit" style="background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer;">Post</button>
+    </form>
+  </div>
+
+  <script>
+    function prepareReply(parentId, targetUsername) {
+      const box = document.getElementById('replyBox-' + parentId);
+      box.style.display = 'block';
+
+      const inputField = box.querySelector('input[type="text"]');
+      inputField.value = '@' + targetUsername + ' ';
+      inputField.focus();
+    }
+  </script>
+</div>
+</body>
+</html>

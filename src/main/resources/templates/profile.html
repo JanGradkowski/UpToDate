@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${targetUser.username} + ' - Profile'"></title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="background-color: #fafafa; color: #1a1a1a;">
+
+<div th:replace="~{fragments/navbar :: main-navbar}"></div>
+
+<main class="profile-container">
+  <header class="profile-header">
+    <div class="profile-header-left">
+      <div th:if="${hasActiveStory}" th:data-username="${targetUser.username}" onclick="openStoryViewer(this.getAttribute('data-username'))"
+           th:style="${hasUnseenStory} ? 'background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); padding: 4px; border-radius: 50%; cursor: pointer; display: inline-block;' : 'background: #dbdbdb; padding: 4px; border-radius: 50%; cursor: pointer; display: inline-block;'">
+        <img th:src="${targetUser.profilePictureUrl != null ? targetUser.profilePictureUrl : '/css/default-avatar.png'}" class="profile-main-avatar" style="border: 3px solid #fafafa; margin: 0;">
+      </div>
+      <img th:unless="${hasActiveStory}" th:src="${targetUser.profilePictureUrl != null ? targetUser.profilePictureUrl : '/css/default-avatar.png'}" class="profile-main-avatar">
+    </div>
+    <div class="profile-header-right">
+      <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1rem;">
+        <h2 class="profile-username" th:text="${targetUser.username}" style="margin: 0;">Username</h2>
+        <button th:unless="${currentUser.username == targetUser.username}" th:data-username="${targetUser.username}" onclick="blockUser(this.getAttribute('data-username'))" style="color: #b21f1f; font-size: 0.85rem; font-weight: 600; background: none; border: none; cursor: pointer;">
+          Block User
+        </button>
+        <div th:if="${currentUser.username == targetUser.username}">
+          <a th:href="@{/settings}">
+            <button class="btn" style="background-color: #efefef; color: black; font-weight: 600; padding: 5px 15px; cursor: pointer;">Edit profile</button>
+          </a>
+        </div>
+        <div th:unless="${currentUser.username == targetUser.username}" style="display: flex; gap: 0.5rem; align-items: center;">
+          <form th:action="@{'/user/' + ${targetUser.username} + '/follow'}" method="POST" style="margin: 0;">
+            <button th:if="${targetUser.isFollowed(currentUser)}" type="submit" class="btn" style="background-color: #efefef; color: black; font-weight: 600; padding: 5px 15px;">Following</button>
+            <button th:if="${targetUser.hasPendingRequestFrom(currentUser)}" type="submit" class="btn" style="background-color: #efefef; color: black; font-weight: 600; padding: 5px 15px;">Requested</button>
+            <button th:unless="${targetUser.isFollowed(currentUser) || targetUser.hasPendingRequestFrom(currentUser)}" type="submit" class="btn btn-primary" style="padding: 5px 20px; font-weight: 600;">Follow</button>
+          </form>
+          <a th:href="@{'/direct/' + ${targetUser.username}}" class="btn" style="background-color: #efefef; color: black; font-weight: 600; padding: 5px 15px; text-decoration: none; display: inline-flex; align-items: center;">Message</a>
+        </div>
+      </div>
+
+      <div class="profile-stats" style="display: flex; gap: 2rem; margin-bottom: 1rem;">
+        <span><strong th:text="${postCount}">0</strong> posts</span>
+        <span style="cursor: pointer;" onclick="openModal('followersModal')"><strong th:text="${targetUser.followers.size()}">0</strong> followers</span>
+        <span style="cursor: pointer;" onclick="openModal('followingModal')"><strong th:text="${targetUser.following.size()}">0</strong> following</span>
+      </div>
+
+      <div class="profile-bio-box">
+        <p class="profile-bio" th:text="${targetUser.bio}"></p>
+        <div class="profile-interests-tags" style="margin-top: 0.5rem;">
+          <span th:each="interest : ${targetUser.interestWeights.keySet()}" th:text="${interest}" class="profile-tag">Tag</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <hr style="border: 0; border-top: 1px solid #dbdbdb; margin-bottom: 2rem;">
+
+  <div th:unless="${canViewProfile}" style="text-align: center; padding: 4rem 2rem; background: white; border: 1px solid #dbdbdb; border-radius: 8px;">
+    <h3 style="margin-bottom: 0.5rem;">🔒 This Account is Private</h3>
+    <p style="color: #666; font-size: 0.9rem;">Follow this account to see their photos and videos.</p>
+  </div>
+
+  <div th:if="${canViewProfile}">
+    <div style="display: flex; justify-content: center; gap: 3rem; border-top: 1px solid #dbdbdb; padding-top: 1rem; margin-bottom: 1.5rem;">
+      <button onclick="switchTab('posts')" id="tab-btn-posts" style="background: none; border: none; font-weight: 700; color: #1a1a1a; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px;">▦ POSTS</button>
+      <button onclick="switchTab('bursts')" id="tab-btn-bursts" style="background: none; border: none; font-weight: 400; color: #888; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px;">🎬 BURSTS</button>
+      <button th:if="${isOwner}" onclick="switchTab('saved')" id="tab-btn-saved" style="background: none; border: none; font-weight: 400; color: #888; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px;">🔖 SAVED</button>
+      <button th:if="${isOwner}" onclick="switchTab('archive')" id="tab-btn-archive" style="background: none; border: none; font-weight: 400; color: #888; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px;">⏱️ ARCHIVE</button>
+    </div>
+
+    <div id="grid-posts">
+      <div class="profile-photo-grid">
+        <th:block th:each="post : ${posts}">
+          <div th:if="${post.mediaType == null or post.mediaType.name() == 'IMAGE'}" class="grid-image-wrapper">
+            <a th:href="@{'/post/' + ${post.id}}">
+              <th:block th:if="${!post.imageUrls.isEmpty()}">
+                <img th:src="${post.getFirstImageUrl()}" alt="Grid Post Image">
+                <div th:if="${post.imageUrls.size() > 1}" style="position: absolute; top: 8px; right: 8px; color: white; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-size: 0.8rem;">
+                  <svg aria-label="Carousel" fill="currentColor" height="16" viewBox="0 0 48 48" width="16"><path d="M34.8 29.7V11c0-2.9-2.3-5.2-5.2-5.2H11c-2.9 0-5.2 2.3-5.2 5.2v18.7c0 2.9 2.3 5.2 5.2 5.2h18.7c2.8-.1 5.1-2.4 5.1-5.2zM39.2 15v16.1c0 4.5-3.7 8.2-8.2 8.2H14.9c-.6 0-.9.7-.5 1.1 1.6 1.5 3.7 2.4 6 2.4h13.4c5.5 0 10-4.5 10-10V18.5c0-2.3-.9-4.4-2.4-6-.4-.4-1.1-.1-1.1.5z"></path></svg>
+                </div>
+              </th:block>
+              <th:block th:if="${post.imageUrls.isEmpty()}">
+                <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); padding: 1rem; text-align: center; color: #1a1a1a; position: absolute; top: 0; left: 0;">
+                  <span style="font-size: 0.85rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;" th:text="${post.caption}">Thought</span>
+                </div>
+                <div style="position: absolute; top: 8px; right: 8px; color: #888; background: rgba(255,255,255,0.8); border: 1px solid #ddd; padding: 3px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">💭</div>
+              </th:block>
+            </a>
+          </div>
+        </th:block>
+      </div>
+    </div>
+
+    <div id="grid-bursts" style="display: none;">
+      <div class="profile-photo-grid">
+        <th:block th:each="post : ${posts}">
+          <div th:if="${post.mediaType != null and post.mediaType.name() == 'REEL'}" class="grid-image-wrapper">
+            <a th:href="@{'/post/' + ${post.id}}">
+              <video th:src="${post.getFirstImageUrl()}" style="width: 100%; height: 100%; object-fit: cover;" muted playsinline></video>
+              <div style="position: absolute; top: 8px; right: 8px; color: white; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-size: 0.8rem;">🎬</div>
+            </a>
+          </div>
+        </th:block>
+      </div>
+    </div>
+
+    <div th:if="${isOwner}" id="grid-saved" style="display: none;">
+      <div th:if="${savedPosts == null or savedPosts.isEmpty()}" style="text-align: center; color: #888; padding: 3rem;">
+        <h2>Nothing Saved Yet</h2>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Save posts to keep them visible on your private tab.</p>
+      </div>
+      <div th:unless="${savedPosts == null or savedPosts.isEmpty()}" class="profile-photo-grid">
+        <div th:each="post : ${savedPosts}" class="grid-image-wrapper">
+          <a th:href="@{'/post/' + ${post.id}}">
+            <th:block th:if="${post.mediaType != null and post.mediaType.name() == 'REEL'}">
+              <video th:src="${post.getFirstImageUrl()}" style="width: 100%; height: 100%; object-fit: cover;" muted playsinline></video>
+              <div style="position: absolute; top: 8px; right: 8px; color: white; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-size: 0.8rem;">🎬</div>
+            </th:block>
+            <th:block th:if="${(post.mediaType == null or post.mediaType.name() == 'IMAGE') and !post.imageUrls.isEmpty()}">
+              <img th:src="${post.getFirstImageUrl()}" alt="Grid Post Image">
+              <div th:if="${post.imageUrls.size() > 1}" style="position: absolute; top: 8px; right: 8px; color: white; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-size: 0.8rem;">
+                <svg aria-label="Carousel" fill="currentColor" height="16" viewBox="0 0 48 48" width="16"><path d="M34.8 29.7V11c0-2.9-2.3-5.2-5.2-5.2H11c-2.9 0-5.2 2.3-5.2 5.2v18.7c0 2.9 2.3 5.2 5.2 5.2h18.7c2.8-.1 5.1-2.4 5.1-5.2zM39.2 15v16.1c0 4.5-3.7 8.2-8.2 8.2H14.9c-.6 0-.9.7-.5 1.1 1.6 1.5 3.7 2.4 6 2.4h13.4c5.5 0 10-4.5 10-10V18.5c0-2.3-.9-4.4-2.4-6-.4-.4-1.1-.1-1.1.5z"></path></svg>
+              </div>
+            </th:block>
+            <th:block th:if="${(post.mediaType == null or post.mediaType.name() == 'IMAGE') and post.imageUrls.isEmpty()}">
+              <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); padding: 1rem; text-align: center; color: #1a1a1a; position: absolute; top: 0; left: 0;">
+                <span style="font-size: 0.85rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;" th:text="${post.caption}">Thought</span>
+              </div>
+              <div style="position: absolute; top: 8px; right: 8px; color: #888; background: rgba(255,255,255,0.8); border: 1px solid #ddd; padding: 3px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">💭</div>
+            </th:block>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div th:if="${isOwner}" id="grid-archive" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 1rem;">
+        <h3 style="margin: 0; font-size: 1.1rem;">Story Archive</h3>
+        <button class="btn btn-primary" style="padding: 5px 15px; font-size: 0.8rem;">+ Create Highlight</button>
+      </div>
+      <div th:if="${storyArchive == null or storyArchive.isEmpty()}" style="text-align: center; color: #888; padding: 3rem;">
+        <h2>No Expired Stories</h2>
+      </div>
+      <div th:unless="${storyArchive == null or storyArchive.isEmpty()}" class="profile-photo-grid">
+        <div th:each="story : ${storyArchive}" class="grid-image-wrapper">
+          <img th:src="${story.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+          <div style="position: absolute; top: 8px; left: 8px; color: white; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;" th:text="${#temporals.format(story.createdAt, 'dd MMM')}">Date</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="followersModal" class="modal-overlay" onclick="closeModal(event, this)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>Followers</span>
+      <button onclick="closeModalDirect('followersModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <div class="modal-body">
+      <a th:each="follower : ${targetUser.followers}" th:href="@{'/profile/' + ${follower.username}}" class="modal-user-row">
+        <img th:src="${follower.profilePictureUrl != null ? follower.profilePictureUrl : '/css/default-avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+        <strong th:text="${follower.username}">username</strong>
+      </a>
+      <div th:if="${targetUser.followers.isEmpty()}" style="text-align: center; color: #888;">No followers yet.</div>
+    </div>
+  </div>
+</div>
+
+<div id="followingModal" class="modal-overlay" onclick="closeModal(event, this)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>Following</span>
+      <button onclick="closeModalDirect('followingModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <div class="modal-body">
+      <a th:each="followed : ${targetUser.following}" th:href="@{'/profile/' + ${followed.username}}" class="modal-user-row">
+        <img th:src="${followed.profilePictureUrl != null ? followed.profilePictureUrl : '/css/default-avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+        <strong th:text="${followed.username}">username</strong>
+      </a>
+      <div th:if="${targetUser.following.isEmpty()}" style="text-align: center; color: #888;">Not following anyone.</div>
+    </div>
+  </div>
+</div>
+
+<div id="storyViewerOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 9999; flex-direction: column;">
+  <div id="storyProgressContainer" style="display: flex; gap: 4px; padding: 10px; position: absolute; top: 0; width: 100%; z-index: 10001; box-sizing: border-box;"></div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 25px 15px 10px 15px; position: absolute; top: 10px; width: 100%; z-index: 10001; box-sizing: border-box; background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);">
+    <div style="display: flex; align-items: center; gap: 10px; color: white;">
+      <img id="storyAvatar" src="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+      <span id="storyUsername" style="font-weight: 600; font-size: 0.9rem; text-shadow: 1px 1px 2px black;"></span>
+    </div>
+    <button onclick="closeStoryViewer()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; text-shadow: 1px 1px 2px black;">✕</button>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; align-items: center; position: relative;">
+    <video id="storyVideo" style="display: none; width: 100%; height: 100%; object-fit: cover;" playsinline></video>
+    <img id="storyImage" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+    <div id="tapLeft" style="position: absolute; left: 0; top: 0; width: 30%; height: 100%; z-index: 10000;"></div>
+    <div id="tapRight" style="position: absolute; right: 0; top: 0; width: 70%; height: 100%; z-index: 10000;"></div>
+  </div>
+
+  <div id="storyViewerActions" style="display: none; position: absolute; bottom: 20px; right: 20px; z-index: 10001;">
+    <button id="storyLikeBtn" onclick="likeCurrentStory()" style="background: none; border: none; font-size: 2rem; cursor: pointer; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)); transition: transform 0.2s;">🤍</button>
+  </div>
+
+  <div id="storyOwnerStats" style="display: none; position: absolute; bottom: 20px; left: 20px; color: white; z-index: 10001; text-shadow: 1px 1px 2px black; cursor: pointer;" onclick="toggleStoryDetails()">
+    <span style="font-size: 1.2rem;">👁️</span> <span id="storyViewCount" style="font-weight: bold;">0</span> views <span style="font-size: 0.8rem; margin-left: 5px;">(Tap to view)</span>
+  </div>
+
+  <div id="storyDetailsPanel" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; z-index: 10002; padding: 20px; box-sizing: border-box; overflow-y: auto; color: black; box-shadow: 0px -5px 15px rgba(0,0,0,0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0;">Story Details</h3>
+      <button onclick="toggleStoryDetails()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    </div>
+    <h4 style="margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">❤️ Liked By</h4>
+    <div id="storyLikersList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;"></div>
+    <h4 style="margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">👁️ Viewed By</h4>
+    <div id="storyViewersList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+  </div>
+</div>
+
+<script th:inline="javascript">
+  // --- PROFILE TAB ENGINE ---
+  function switchTab(tabName) {
+    const grids = ['posts', 'bursts', 'saved', 'archive'];
+    grids.forEach(name => {
+      const gridElement = document.getElementById('grid-' + name);
+      const btnElement = document.getElementById('tab-btn-' + name);
+      if (gridElement) { gridElement.style.display = (name === tabName) ? 'block' : 'none'; }
+      if (btnElement) {
+        btnElement.style.fontWeight = (name === tabName) ? '700' : '400';
+        btnElement.style.color = (name === tabName) ? '#1a1a1a' : '#888';
+      }
+    });
+  }
+
+  function blockUser(username) {
+    if(confirm("Are you sure you want to block " + username + "? They will not be able to find your profile or see your posts.")) {
+      fetch('/api/users/' + username + '/block', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.csrfToken }
+      }).then(res => {
+        if(res.ok) { window.location.href = '/feed'; }
+        else { alert("Unable to block this user."); }
+      });
+    }
+  }
+
+  function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModalDirect(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+  function closeModal(event, element) {
+    if (event.target === element) {
+      element.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+  }
+
+  // --- STORY VIEWER ENGINE SCRIPTS ---
+  let currentStories = [];
+  let currentIndex = 0;
+  let storyTimer;
+  let progressAnimation;
+  let isPaused = false;
+  let startTime;
+  let remainingTime = 5000;
+
+  const overlay = document.getElementById('storyViewerOverlay');
+  const imgEl = document.getElementById('storyImage');
+  const vidEl = document.getElementById('storyVideo');
+  const progressContainer = document.getElementById('storyProgressContainer');
+
+  function openStoryViewer(username) {
+    fetch(`/api/stories/user/${username}/active`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.length === 0) return;
+              currentStories = data;
+              currentIndex = 0;
+              document.getElementById('storyAvatar').src = data[0].userAvatar;
+              document.getElementById('storyUsername').innerText = data[0].username;
+              buildProgressBars();
+              overlay.style.display = 'flex';
+              renderCurrentStory();
+            });
+  }
+
+  function buildProgressBars() {
+    progressContainer.innerHTML = '';
+    currentStories.forEach((_, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.flex = '1';
+      wrapper.style.height = '3px';
+      wrapper.style.background = 'rgba(255,255,255,0.3)';
+      wrapper.style.borderRadius = '2px';
+      wrapper.style.overflow = 'hidden';
+      const bar = document.createElement('div');
+      bar.id = `progress-bar-${i}`;
+      bar.style.height = '100%';
+      bar.style.width = '0%';
+      bar.style.background = 'white';
+      wrapper.appendChild(bar);
+      progressContainer.appendChild(wrapper);
+    });
+  }
+
+  function renderCurrentStory() {
+    clearTimeout(storyTimer);
+    cancelAnimationFrame(progressAnimation);
+    remainingTime = 5000;
+    isPaused = false;
+
+    currentStories.forEach((_, i) => {
+      document.getElementById(`progress-bar-${i}`).style.width = i < currentIndex ? '100%' : '0%';
+    });
+
+    const story = currentStories[currentIndex];
+    const isVideo = story.mediaUrl.endsWith('.mp4') || story.mediaUrl.endsWith('.webm');
+
+    const statsDiv = document.getElementById('storyOwnerStats');
+    const actionsDiv = document.getElementById('storyViewerActions');
+    document.getElementById('storyDetailsPanel').style.display = 'none';
+
+    if (story.isOwner) {
+      statsDiv.style.display = 'block';
+      actionsDiv.style.display = 'none';
+      document.getElementById('storyViewCount').innerText = story.viewCount;
+    } else {
+      statsDiv.style.display = 'none';
+      actionsDiv.style.display = 'block';
+      document.getElementById('storyLikeBtn').innerText = story.isLikedByMe ? '❤️' : '🤍';
+      fetch(`/api/stories/${story.id}/view`, { method: 'POST', headers: { 'X-CSRF-TOKEN': window.csrfToken }});
+    }
+
+    if (isVideo) {
+      imgEl.style.display = 'none';
+      vidEl.style.display = 'block';
+      vidEl.src = story.mediaUrl;
+      vidEl.play();
+      vidEl.onloadedmetadata = () => {
+        remainingTime = vidEl.duration * 1000;
+        startProgressBar(remainingTime);
+      };
+      vidEl.onended = nextStory;
+    } else {
+      vidEl.style.display = 'none';
+      vidEl.pause();
+      imgEl.style.display = 'block';
+      imgEl.src = story.mediaUrl;
+      startProgressBar(remainingTime);
+      storyTimer = setTimeout(nextStory, remainingTime);
+    }
+  }
+
+  function likeCurrentStory() {
+    const story = currentStories[currentIndex];
+    fetch(`/api/stories/${story.id}/like`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.csrfToken }
+    })
+            .then(res => res.json())
+            .then(data => {
+              story.isLikedByMe = data.liked;
+              document.getElementById('storyLikeBtn').innerText = data.liked ? '❤️' : '🤍';
+            });
+  }
+
+  function toggleStoryDetails() {
+    const panel = document.getElementById('storyDetailsPanel');
+    if (panel.style.display === 'none') {
+      isPaused = true;
+      clearTimeout(storyTimer);
+      if (vidEl.style.display === 'block') vidEl.pause();
+      panel.style.display = 'block';
+      populateStoryDetails();
+    } else {
+      panel.style.display = 'none';
+      isPaused = false;
+      if (vidEl.style.display === 'block') vidEl.play();
+      if (imgEl.style.display === 'block') storyTimer = setTimeout(nextStory, remainingTime);
+      requestAnimationFrame(time => startProgressBar(remainingTime));
+    }
+  }
+
+  function populateStoryDetails() {
+    const story = currentStories[currentIndex];
+    const likersDiv = document.getElementById('storyLikersList');
+    const viewersDiv = document.getElementById('storyViewersList');
+
+    likersDiv.innerHTML = story.likedBy.length === 0 ? '<span style="color:#888; font-size:0.9rem;">No likes yet.</span>' : '';
+    story.likedBy.forEach(u => {
+      likersDiv.innerHTML += `<div style="display:flex; align-items:center; gap:10px;"><img src="${u.avatarUrl}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;"> <span style="font-weight:600;">${u.username}</span></div>`;
+    });
+
+    viewersDiv.innerHTML = story.viewedBy.length === 0 ? '<span style="color:#888; font-size:0.9rem;">No views yet.</span>' : '';
+    story.viewedBy.forEach(u => {
+      viewersDiv.innerHTML += `<div style="display:flex; align-items:center; gap:10px;"><img src="${u.avatarUrl}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;"> <span style="font-weight:600;">${u.username}</span></div>`;
+    });
+  }
+
+  function startProgressBar(duration) {
+    startTime = performance.now();
+    const bar = document.getElementById(`progress-bar-${currentIndex}`);
+
+    function animate(currentTime) {
+      if (isPaused) {
+        startTime += (currentTime - startTime);
+      } else {
+        const elapsed = currentTime - startTime;
+        const percentage = Math.min((elapsed / duration) * 100, 100);
+        bar.style.width = percentage + '%';
+        if (percentage < 100) progressAnimation = requestAnimationFrame(animate);
+      }
+    }
+    progressAnimation = requestAnimationFrame(animate);
+  }
+
+  function nextStory() {
+    if (currentIndex < currentStories.length - 1) {
+      currentIndex++;
+      renderCurrentStory();
+    } else {
+      closeStoryViewer();
+    }
+  }
+
+  function prevStory() {
+    if (currentIndex > 0) {
+      currentIndex--;
+      renderCurrentStory();
+    } else {
+      renderCurrentStory();
+    }
+  }
+
+  function closeStoryViewer() {
+    overlay.style.display = 'none';
+    vidEl.pause();
+    vidEl.src = "";
+    clearTimeout(storyTimer);
+    cancelAnimationFrame(progressAnimation);
+    document.getElementById('storyDetailsPanel').style.display = 'none';
+  }
+
+  const tapLeft = document.getElementById('tapLeft');
+  const tapRight = document.getElementById('tapRight');
+  let holdTimer;
+
+  function handleTouchStart() {
+    holdTimer = setTimeout(() => {
+      isPaused = true;
+      if (vidEl.style.display === 'block') vidEl.pause();
+      clearTimeout(storyTimer);
+    }, 200);
+  }
+
+  function handleTouchEnd() {
+    clearTimeout(holdTimer);
+    if (isPaused && document.getElementById('storyDetailsPanel').style.display === 'none') {
+      isPaused = false;
+      if (vidEl.style.display === 'block') vidEl.play();
+      if (imgEl.style.display === 'block') storyTimer = setTimeout(nextStory, remainingTime);
+      requestAnimationFrame(time => startProgressBar(remainingTime));
+    }
+  }
+
+  [tapLeft, tapRight].forEach(zone => {
+    zone.addEventListener('mousedown', handleTouchStart);
+    zone.addEventListener('mouseup', handleTouchEnd);
+    zone.addEventListener('touchstart', handleTouchStart);
+    zone.addEventListener('touchend', handleTouchEnd);
+  });
+
+  tapLeft.addEventListener('click', (e) => { if (!isPaused) prevStory(); });
+  tapRight.addEventListener('click', (e) => { if (!isPaused) nextStory(); });
+</script>
+</body>
+</html>

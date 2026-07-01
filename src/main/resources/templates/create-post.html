@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Post - UpToDate</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body style="background-color: #fafafa; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+
+<div class="auth-container" style="max-width: 500px; width: 100%;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2>New Post</h2>
+    <a th:href="@{/feed}" style="text-decoration: none; font-size: 1.5rem; color: #1a1a1a;">✕</a>
+  </div>
+
+  <div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #dbdbdb; padding-bottom: 0.5rem;">
+    <button type="button" id="tab-image" onclick="setPostType('IMAGE')" style="background: none; border: none; font-weight: 700; cursor: pointer; color: #1a1a1a; font-size: 1.1rem; padding: 0;">📷 Photo</button>
+    <button type="button" id="tab-reel" onclick="setPostType('REEL')" style="background: none; border: none; font-weight: 400; cursor: pointer; color: #888; font-size: 1.1rem; padding: 0;">🎬 Burst</button>
+    <button type="button" id="tab-thought" onclick="setPostType('THOUGHT')" style="background: none; border: none; font-weight: 400; cursor: pointer; color: #888; font-size: 1.1rem; padding: 0;">💭 Thought</button>
+  </div>
+
+  <form th:action="@{/post/create}" method="POST" enctype="multipart/form-data" class="auth-form" id="postForm">
+
+    <input type="hidden" id="postTypeInput" name="postType" value="IMAGE">
+
+    <div id="mediaSection" class="form-group avatar-upload-group" style="margin-bottom: 1rem; position: relative;">
+      <div class="avatar-preview-container" style="width: 100%; height: 300px; border-radius: 8px;" onclick="document.getElementById('mediaUpload').click()">
+
+        <div id="mediaPlaceholder" class="avatar-placeholder">
+          <span id="uploadIcon" style="font-size: 3rem;">📷</span>
+          <span style="font-size: 1rem; margin-top: 10px;">Select from computer</span>
+          <span id="uploadHint" style="font-size: 0.8rem; color: #888;">(You can select multiple!)</span>
+        </div>
+
+        <img id="imagePreview" src="#" alt="Preview" style="display: none; border-radius: 8px; width: 100%; height: 100%; object-fit: cover;">
+        <video id="videoPreview" src="#" style="display: none; border-radius: 8px; width: 100%; height: 100%; object-fit: cover;" autoplay loop muted></video>
+
+      </div>
+
+      <input type="file" id="mediaUpload" name="images" accept="image/*" multiple required style="display: none;" onchange="previewMedia(event)">
+
+      <div id="mediaCountBadge" style="display: none; position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;"></div>
+    </div>
+
+    <div class="form-group">
+      <textarea id="captionInput" name="caption" rows="4" placeholder="Write a caption... Don't forget your #hashtags!" style="border: none; border-bottom: 1px solid #ccc; border-radius: 0; padding-left: 0; padding-right: 0;" oninput="updateCounter()" required></textarea>
+      <div id="charCounter" style="display: none; text-align: right; font-size: 0.8rem; color: #888; margin-top: 5px;">0 / 280</div>
+    </div>
+
+    <button type="submit" id="submitBtn" class="btn btn-primary auth-submit" style="margin-top: 0.5rem;">Share Post</button>
+  </form>
+</div>
+
+<script>
+  function setPostType(type) {
+    const mediaSection = document.getElementById('mediaSection');
+    const postTypeInput = document.getElementById('postTypeInput');
+    const mediaUpload = document.getElementById('mediaUpload');
+    const captionInput = document.getElementById('captionInput');
+    const charCounter = document.getElementById('charCounter');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadIcon = document.getElementById('uploadIcon');
+    const uploadHint = document.getElementById('uploadHint');
+
+    // Tabs
+    const tabImage = document.getElementById('tab-image');
+    const tabReel = document.getElementById('tab-reel');
+    const tabThought = document.getElementById('tab-thought');
+
+    postTypeInput.value = type;
+
+    // Reset Tab Styles
+    tabImage.style.fontWeight = '400'; tabImage.style.color = '#888';
+    tabReel.style.fontWeight = '400'; tabReel.style.color = '#888';
+    tabThought.style.fontWeight = '400'; tabThought.style.color = '#888';
+
+    // Clear existing previews when swapping
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('videoPreview').style.display = 'none';
+    document.getElementById('videoPreview').pause();
+    document.getElementById('mediaPlaceholder').style.display = 'flex';
+    document.getElementById('mediaCountBadge').style.display = 'none';
+    mediaUpload.value = '';
+
+    if (type === 'IMAGE') {
+      tabImage.style.fontWeight = '700';
+      tabImage.style.color = '#1a1a1a';
+
+      mediaSection.style.display = 'block';
+      mediaUpload.setAttribute('required', 'true');
+      mediaUpload.setAttribute('accept', 'image/*');
+      mediaUpload.setAttribute('multiple', 'true');
+
+      uploadIcon.innerText = '📷';
+      uploadHint.innerText = '(You can select multiple!)';
+
+      captionInput.rows = 4;
+      captionInput.placeholder = "Write a caption... Don't forget your #hashtags!";
+      captionInput.removeAttribute('maxlength');
+      charCounter.style.display = 'none';
+      submitBtn.innerText = 'Share Post';
+
+    } else if (type === 'REEL') {
+      tabReel.style.fontWeight = '700';
+      tabReel.style.color = '#1a1a1a';
+
+      mediaSection.style.display = 'block';
+      mediaUpload.setAttribute('required', 'true');
+      mediaUpload.setAttribute('accept', 'video/mp4,video/webm');
+      mediaUpload.removeAttribute('multiple'); // 1 video per burst
+
+      uploadIcon.innerText = '🎬';
+      uploadHint.innerText = '(Select a vertical video)';
+
+      captionInput.rows = 4;
+      captionInput.placeholder = "Describe your Burst...";
+      captionInput.removeAttribute('maxlength');
+      charCounter.style.display = 'none';
+      submitBtn.innerText = 'Share Burst';
+
+    } else if (type === 'THOUGHT') {
+      tabThought.style.fontWeight = '700';
+      tabThought.style.color = '#1a1a1a';
+
+      mediaSection.style.display = 'none';
+      mediaUpload.removeAttribute('required'); // Allows text-only submission
+
+      captionInput.rows = 8;
+      captionInput.placeholder = "What's on your mind? (280 characters max)";
+      captionInput.setAttribute('maxlength', '280');
+      charCounter.style.display = 'block';
+      updateCounter();
+      submitBtn.innerText = 'Share Thought';
+    }
+  }
+
+  function updateCounter() {
+    if (document.getElementById('postTypeInput').value === 'THOUGHT') {
+      const length = document.getElementById('captionInput').value.length;
+      const counter = document.getElementById('charCounter');
+      counter.innerText = length + ' / 280';
+      counter.style.color = length >= 280 ? '#b21f1f' : '#888';
+    }
+  }
+
+  function previewMedia(event) {
+    const files = event.target.files;
+    const postType = document.getElementById('postTypeInput').value;
+    const imgPreview = document.getElementById('imagePreview');
+    const vidPreview = document.getElementById('videoPreview');
+    const placeholder = document.getElementById('mediaPlaceholder');
+    const badge = document.getElementById('mediaCountBadge');
+
+    if (files && files.length > 0) {
+      const url = URL.createObjectURL(files[0]);
+
+      if (postType === 'REEL') {
+        vidPreview.src = url;
+        vidPreview.style.display = 'block';
+        imgPreview.style.display = 'none';
+      } else {
+        imgPreview.src = url;
+        imgPreview.style.display = 'block';
+        vidPreview.style.display = 'none';
+        vidPreview.pause();
+      }
+
+      placeholder.style.display = 'none';
+
+      if (postType === 'IMAGE') {
+        badge.innerText = files.length > 1 ? `1 of ${files.length} 🖼️` : '1 image';
+      } else {
+        badge.innerText = '1 video 🎬';
+      }
+      badge.style.display = 'block';
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="main-navbar">
+
+  <nav class="feed-navbar">
+    <div class="nav-content">
+      <div class="logo-text"><a th:href="@{/feed}" style="color: inherit; text-decoration: none;">UpToDate</a></div>
+
+      <div class="search-container" style="position: relative;">
+        <form th:action="@{/feed}" method="GET" class="search-form">
+          <input type="text" id="liveSearchInput" name="search" placeholder="🔍 Search users..." autocomplete="off">
+          <button type="submit" style="display: none;">Search</button>
+        </form>
+        <div id="searchResultsDropdown" class="live-search-dropdown" style="display: none;"></div>
+      </div>
+
+      <div class="nav-icons" style="display: flex; align-items: center; gap: 1.5rem;">
+        <a th:href="@{/feed}" style="text-decoration: none; font-size: 1.3rem;">🏠</a>
+
+        <a th:href="@{/bursts}" style="text-decoration: none; font-size: 1.3rem;">🎬</a>
+
+        <a th:href="@{/inbox}" style="text-decoration: none; font-size: 1.3rem;">✉️</a>
+        <a th:href="@{/post/create}" style="text-decoration: none; font-size: 1.3rem;">➕</a>
+
+        <div style="position: relative; cursor: pointer;" onclick="toggleNotifications(event)">
+          <span style="font-size: 1.3rem;">🔔</span>
+          <span id="navNotificationBadge" class="notification-badge">0</span>
+
+          <div id="navNotificationDropdown" class="notification-dropdown" onclick="event.stopPropagation()">
+            <div style="padding: 10px 15px; font-weight: 700; border-bottom: 1px solid #dbdbdb;">Notifications</div>
+            <div id="notificationListBody">
+              <div style="padding: 15px; text-align: center; color: #888;">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <a th:href="@{'/profile/' + ${currentUser.username}}">
+          <img th:src="${currentUser.profilePictureUrl != null ? currentUser.profilePictureUrl : '/css/default-avatar.png'}" class="nav-avatar" alt="My Profile">
+        </a>
+      </div>
+    </div>
+  </nav>
+  <div id="globalLikesModal" class="modal-overlay" onclick="closeModal(event, this)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span>Likes</span>
+        <button onclick="closeModalDirect('globalLikesModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+      </div>
+      <div id="globalLikesModalBody" class="modal-body">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // This function fetches the likes dynamically from our REST API!
+    function showLikes(type, id) {
+      const body = document.getElementById('globalLikesModalBody');
+
+      // Show a loading state, then open the modal
+      body.innerHTML = '<div style="text-align: center; color: #888;">Loading...</div>';
+      document.getElementById('globalLikesModal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      // Fetch the data
+      fetch(`/api/${type}/${id}/likes`)
+              .then(response => response.json())
+              .then(users => {
+                body.innerHTML = ''; // Clear loading text
+
+                if (users.length === 0) {
+                  body.innerHTML = '<div style="text-align: center; color: #888;">No likes yet.</div>';
+                  return;
+                }
+
+                // Build the HTML for each user
+                users.forEach(user => {
+                  const avatar = user.profilePictureUrl ? user.profilePictureUrl : '/css/default-avatar.png';
+                  body.innerHTML += `
+                                <a href="/profile/${user.username}" class="modal-user-row">
+                                    <img src="${avatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                    <strong>${user.username}</strong>
+                                </a>
+                            `;
+                });
+              });
+    }
+
+    function closeModalDirect(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+
+    function closeModal(event, element) {
+      if (event.target === element) {
+        element.style.display = 'none';
+        document.body.style.overflow = 'auto';
+      }
+    }
+  </script>
+
+  <script>
+    const searchInput = document.getElementById('liveSearchInput');
+    const dropdown = document.getElementById('searchResultsDropdown');
+
+    if (searchInput && dropdown) {
+      searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length === 0) {
+          dropdown.style.display = 'none';
+          dropdown.innerHTML = '';
+          return;
+        }
+
+        fetch('/api/search?q=' + encodeURIComponent(query))
+                .then(response => response.json())
+                .then(users => {
+                  dropdown.innerHTML = '';
+                  if (users.length > 0) {
+                    dropdown.style.display = 'block';
+                    users.forEach(user => {
+                      const userRow = document.createElement('a');
+                      userRow.href = '/profile/' + user.username;
+                      userRow.className = 'dropdown-item';
+                      userRow.innerHTML = `
+                                        <img src="${user.avatar}" class="nav-avatar" style="width: 24px; height: 24px;">
+                                        <span>${user.username}</span>
+                                    `;
+                      dropdown.appendChild(userRow);
+                    });
+                  } else {
+                    dropdown.style.display = 'none';
+                  }
+                });
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+          dropdown.style.display = 'none';
+        }
+      });
+    }
+  </script>
+  <script th:inline="javascript">
+    // 1. Grab the CSRF token safely from Spring Security!
+    window.csrfToken = /*[[${_csrf.token}]]*/ '';
+
+    document.addEventListener("DOMContentLoaded", fetchNotificationData);
+
+    function fetchNotificationData() {
+      fetch('/api/notifications')
+              .then(res => {
+                if (!res.ok) throw new Error("Server returned status: " + res.status);
+                return res.json();
+              })
+              .then(data => {
+                const badge = document.getElementById('navNotificationBadge');
+                if (data.unreadCount > 0) {
+                  badge.innerText = data.unreadCount > 99 ? '99+' : data.unreadCount;
+                  badge.style.display = 'block';
+                } else {
+                  badge.style.display = 'none';
+                }
+                buildNotificationHtml(data.notifications);
+              })
+              .catch(error => {
+                console.error("Fetch Error:", error);
+                const body = document.getElementById('notificationListBody');
+                body.innerHTML = '<div style="padding: 15px; text-align: center; color: #b21f1f; font-weight: 600;">Failed to load notifications.<br><span style="font-size:0.8rem; font-weight:normal;">Check IntelliJ Console!</span></div>';
+              });
+    }
+
+    function buildNotificationHtml(notifications) {
+      const body = document.getElementById('notificationListBody');
+      if (notifications.length === 0) {
+        body.innerHTML = '<div style="padding: 15px; text-align: center; color: #888;">No recent activity.</div>';
+        return;
+      }
+
+      body.innerHTML = '';
+      notifications.forEach(n => {
+        const unreadClass = n.isRead ? '' : 'notification-unread';
+        body.innerHTML += `
+                <a href="${n.link}" class="notification-item ${unreadClass}" onclick="markAsRead(event, ${n.id}, '${n.link}')">
+                    <img src="${n.senderAvatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <div style="flex: 1; font-size: 0.9rem;">
+                        <strong>${n.senderUsername}</strong> ${n.message}
+                    </div>
+                    ${!n.isRead ? '<div style="width: 8px; height: 8px; background: #0095f6; border-radius: 50%;"></div>' : ''}
+                </a>
+            `;
+      });
+    }
+
+    function toggleNotifications(event) {
+      event.stopPropagation();
+      const dropdown = document.getElementById('navNotificationDropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+
+      if (dropdown.style.display === 'block') {
+        fetchNotificationData();
+
+        const badge = document.getElementById('navNotificationBadge');
+        if (badge.style.display === 'block') {
+          badge.style.display = 'none';
+
+          // 2. Attach the CSRF token to the headers!
+          fetch('/api/notifications/mark-all-read', {
+            method: 'POST',
+            headers: {
+              'X-CSRF-TOKEN': window.csrfToken
+            }
+          }).catch(err => console.error(err));
+        }
+      }
+    }
+
+    function markAsRead(event, notifId, link) {
+      event.preventDefault();
+
+      // 3. Attach the CSRF token here too!
+      fetch(`/api/notifications/${notifId}/read`, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-TOKEN': window.csrfToken
+        }
+      })
+              .then(() => {
+                window.location.href = link;
+              });
+    }
+
+    document.addEventListener('click', function(e) {
+      const dropdown = document.getElementById('navNotificationDropdown');
+      if (dropdown && dropdown.style.display === 'block') {
+        dropdown.style.display = 'none';
+      }
+    });
+  </script>
+</div>
+
+</body>
+</html>

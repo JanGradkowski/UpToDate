@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:pth="http://www.w3.org/1999/XSL/Transform">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UpToDate - Create Account</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><a th:href="@{/}" style="color: inherit; text-decoration: none;">UpToDate</a></div>
+</nav>
+
+<main class="hero auth-hero">
+  <div class="auth-container">
+    <h2>Join UpToDate</h2>
+    <p class="auth-subtitle">Share your world.</p>
+
+    <form th:action="@{/signup}" th:object="${user}" method="POST" class="auth-form">
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" th:field="*{username}" required placeholder="e.g. john_doe">
+        <p th:if="${usernameError}" style="color: #b21f1f; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600;" th:text="${usernameError}"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" th:field="*{email}" required placeholder="you@example.com">
+        <p th:if="${emailError}" style="color: #b21f1f; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600;" th:text="${emailError}"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" th:field="*{password}" required placeholder="••••••••">
+        <p th:if="${passwordError}" style="color: #b21f1f; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600;" th:text="${passwordError}"></p>
+      </div>
+
+      <button type="submit" class="btn btn-primary auth-submit">Sign Up</button>
+    </form>
+
+    <p class="auth-switch">Already have an account? <a th:href="@{/login}">Log in here</a>.</p>
+  </div>
+</main>
+
+</body>
+</html>
