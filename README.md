@@ -17,7 +17,7 @@
     <td style="width: 50%;"><b>Profile Settings</b><br><br><img src="docs/settings.gif" width="100%" alt="Profile settings Demo"/></td>
   </tr>
   <tr>
-    <td style="width: 50%;"><b>Privacy & Search</b><br><br><img src="docs/lookingupusersandblocking.gif" width="100%" alt="Privacy Demo"/></td>
+    <td style="width: 50%;"><b>Privacy & Search</b><br><br><img src="docs/lookingupuserandblocking.gif" width="100%" alt="Privacy Demo"/></td>
     <td style="width: 50%;"><b>Messaging System</b><br><br><img src="docs/messaging.gif" width="100%" alt="Message Demo"/></td>
   </tr>
 </table>
