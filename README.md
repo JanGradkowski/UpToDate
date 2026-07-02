@@ -1,5 +1,4 @@
 ---
-
 ### 📱 Live Demos
 
 <table style="width: 100%; text-align: center;">
