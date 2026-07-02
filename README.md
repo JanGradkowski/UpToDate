@@ -1,3 +1,25 @@
+---
+
+### 📱 Live Demos
+
+<table style="width: 100%; text-align: center;">
+  <tr>
+    <td style="width: 50%;"><b>The feed</b><br><br><img src="docs/feed.gif" width="100%" alt="Feed Demo"/></td>
+    <td style="width: 50%;"><b>Video Bursts (Endless Scroll)</b><br><br><img src="docs/reels.gif" width="100%" alt="Bursts Demo"/></td>
+    <td style="width: 50%;"><b>Profile Page</b><br><br><img src="docs/profile.gif" width="100%" alt="Profile page Demo"/></td>
+    <td style="width: 50%;"><b>Profile settings</b><br><br><img src="docs/settings.gif" width="100%" alt="Profile settings Demo"/></td>
+    <td style="width: 50%;"><b>Privacy settings & searching for users</b><br><br><img src="docs/lookingupusersandblocking.gif" width="100%" alt="Privacy Demo"/></td>
+      <td style="width: 50%;"><b>Messaging system</b><br><br><img src="docs/messaging.gif" width="100%" alt="Message Demo"/></td>
+  </tr>
+  <tr>
+    <td><b>Creating posts</b><br><br><img src="docs/creating posts.png" width="100%" alt="Creating posts Demo"/></td>
+    <td><b>Notifications</b><br><br><img src="docs/notifications.png" width="100%" alt="Notfications Demo"/></td>
+    <td><b>Profile</b><br><br><img src="docs/profile.png" width="100%" alt="Profile Demo"/></td>
+    <td><b>Settings</b><br><br><img src="docs/settings.png" width="100%" alt="Settings Demo"/></td>
+    <td><b>More settings</b><br><br><img src="docs/settings2.png" width="100%" alt="Settings Demo"/></td>
+  </tr>
+</table>
+
 # UpToDate - Full-Stack Social Media Platform
 
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)
