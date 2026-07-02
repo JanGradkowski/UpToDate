@@ -1,4 +1,11 @@
----
+# UpToDate - Full-Stack Social Media Platform
+
+![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
+![Oracle](https://img.shields.io/badge/Oracle-F80000?style=for-the-badge&logo=oracle&logoColor=white)
+![Thymeleaf](https://img.shields.io/badge/Thymeleaf-005F0F?style=for-the-badge&logo=thymeleaf&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+
 ### 📱 Live Demos
 
 <table style="width: 100%; text-align: center;">
@@ -29,14 +36,6 @@
     <td style="width: 33%;"><b>More Settings</b><br><br><img src="docs/settings2.png" width="100%" alt="Settings Demo"/></td>
     <td style="width: 33%;"></td> </tr>
 </table>
-
-# UpToDate - Full-Stack Social Media Platform
-
-![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![Oracle](https://img.shields.io/badge/Oracle-F80000?style=for-the-badge&logo=oracle&logoColor=white)
-![Thymeleaf](https://img.shields.io/badge/Thymeleaf-005F0F?style=for-the-badge&logo=thymeleaf&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 
 **UpToDate** is a highly scalable, feature-rich social media platform inspired by Instagram. Built from the ground up to handle complex data relationships, it features an algorithmic feed, 24-hour expiring stories, endless-scrolling video "Bursts," real-time telemetry, and secure direct messaging.
 
